@@ -1,0 +1,81 @@
+import type { ServiceConfig } from './schema'
+
+/** Catalogue FICTIF. Durées, prix, acomptes et délais sont des exemples de démonstration. */
+export const servicesStatus = 'demo' as const
+
+export const services: ServiceConfig[] = [
+  {
+    id: 'pose-gel',
+    name: 'Pose complète gel',
+    description: 'Construction sur ongle naturel ou capsule, forme et longueur sur mesure, finition au choix.',
+    durationMin: 120,
+    price: 70,
+    deposit: 20,
+    category: 'pose',
+    returnRecommendedAfterDays: 21,
+    active: true,
+    coverImageId: 'g-pose-01',
+  },
+  {
+    id: 'remplissage',
+    name: 'Remplissage',
+    description: 'Entretien de votre pose : rééquilibrage, limage, nouvelle couleur.',
+    durationMin: 90,
+    price: 45,
+    deposit: 10,
+    category: 'entretien',
+    returnRecommendedAfterDays: 21,
+    active: true,
+    coverImageId: 'g-gel-01',
+  },
+  {
+    id: 'semi-permanent',
+    name: 'Semi-permanent',
+    description: 'Vernis semi-permanent sur ongles naturels, préparation soignée des cuticules.',
+    durationMin: 60,
+    price: 35,
+    deposit: 0,
+    category: 'semi-permanent',
+    returnRecommendedAfterDays: 18,
+    active: true,
+    coverImageId: 'g-semi-01',
+  },
+  {
+    id: 'nail-art',
+    name: 'Nail art',
+    description: 'Décor sur mesure en complément d’une pose ou d’un remplissage, du minimal au graphique.',
+    durationMin: 30,
+    price: 15,
+    deposit: 0,
+    category: 'nail-art',
+    returnRecommendedAfterDays: null,
+    active: true,
+    coverImageId: 'g-art-01',
+  },
+  {
+    id: 'depose',
+    name: 'Dépose',
+    description: 'Retrait en douceur de gel ou semi-permanent, soin de l’ongle naturel.',
+    durationMin: 30,
+    price: 20,
+    deposit: 0,
+    category: 'depose',
+    returnRecommendedAfterDays: null,
+    active: true,
+    coverImageId: 'g-nude-01',
+  },
+  {
+    id: 'depose-pose',
+    name: 'Dépose + nouvelle pose',
+    description: 'Dépose complète puis nouvelle pose gel dans la même séance.',
+    durationMin: 150,
+    price: 85,
+    deposit: 20,
+    category: 'pose',
+    returnRecommendedAfterDays: 21,
+    active: true,
+    coverImageId: 'g-french-01',
+  },
+]
+
+export const serviceById = (id: string) => services.find((s) => s.id === id)
