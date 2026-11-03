@@ -20,7 +20,7 @@ export const services: ServiceConfig[] = [
     id: 'remplissage',
     name: 'Remplissage',
     description: 'Entretien de votre pose : rééquilibrage, limage, nouvelle couleur.',
-    durationMin: 90,
+    durationMin: 60,
     price: 45,
     deposit: 10,
     category: 'entretien',

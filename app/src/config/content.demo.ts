@@ -68,3 +68,13 @@ export const reviews: ReviewItem[] = [
   { author: 'Sarah M.', rating: 5, text: 'Le nail art est exactement ce que j’avais en tête, en mieux.', service: 'Nail art' },
   { author: 'Julie L.', rating: 4, text: 'Très précise et de bon conseil sur la forme.', service: 'Semi-permanent' },
 ]
+
+/** Prestation proposée depuis un visuel de la galerie (configuration verticale Nails). */
+export const serviceForCategory: Record<GalleryCategory, string> = {
+  'pose-complete': 'pose-gel',
+  gel: 'pose-gel',
+  french: 'pose-gel',
+  nude: 'pose-gel',
+  'nail-art': 'nail-art',
+  'semi-permanent': 'semi-permanent',
+}
