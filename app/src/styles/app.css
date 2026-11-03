@@ -206,7 +206,7 @@ a {
   color: var(--ochre);
 }
 .badge--onDark {
-  background: rgba(244, 239, 233, 0.16);
+  background: rgba(20, 16, 14, 0.38);
   color: #f4efe9;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);

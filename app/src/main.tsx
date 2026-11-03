@@ -1,6 +1,7 @@
 import '@fontsource-variable/fraunces/full.css'
 import '@fontsource-variable/fraunces/full-italic.css'
 import '@fontsource-variable/inter'
+import './styles/app.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom'
@@ -15,7 +16,6 @@ import { Dashboard } from './pro/Dashboard'
 import { Novia } from './pro/Novia'
 import { ProLayout } from './pro/ProLayout'
 import { Revenue } from './pro/Revenue'
-import './styles/app.css'
 import { DemoBanner, ScrollTop } from './ui/common'
 
 function Root() {

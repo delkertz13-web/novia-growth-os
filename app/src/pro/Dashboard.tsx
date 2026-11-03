@@ -72,7 +72,7 @@ export function Dashboard() {
                     </div>
                     <Icon name="chevronRight" size={18} />
                   </Link>
-                  <div className="validate__q">Le rendez-vous est terminé. Était-elle présente ?</div>
+                  <div className="validate__q">Le rendez-vous est terminé. Était-elle présente ?</div>
                   <OutcomeButtons a={a} now={now} onPick={(o) => pick(a, o)} />
                 </article>
               )

@@ -114,7 +114,7 @@ export function Booking() {
       <div className="wrap flow__body page" key={step}>
         {step === 'service' && (
           <>
-            <h1 className="display flow__title">Quelle séance ?</h1>
+            <h1 className="display flow__title">Quelle séance ?</h1>
             <p className="flow__lead">Prix et durées de démonstration.</p>
             <div className="choice-list">
               {services.map((s) => (
@@ -144,7 +144,7 @@ export function Booking() {
 
         {step === 'when' && service && (
           <>
-            <h1 className="display flow__title">Quand ?</h1>
+            <h1 className="display flow__title">Quand ?</h1>
             <p className="flow__lead">
               {service.name} · {fmt.duration(service.durationMin)}
               {inspiration && galleryById(inspiration) ? ` · inspiration « ${galleryById(inspiration)!.title} »` : ''}
@@ -291,7 +291,7 @@ function Confirmation({ appointment: a }: { appointment: Appointment }) {
       <div className="eyebrow">Réservation simulée</div>
       <h1 className="display">C’est noté.</h1>
       <p className="muted" style={{ margin: 0 }}>
-        À {capitalize(fmt.dayLong(start))}, {fmt.time(start)}.
+        {capitalize(fmt.dayLong(start))} à {fmt.time(start)}.
       </p>
       <div className="card recap">
         <Row k="Prestation" v={s.name} />
@@ -304,7 +304,7 @@ function Confirmation({ appointment: a }: { appointment: Appointment }) {
         message n’est envoyé.
       </Notice>
       <div className="done__actions">
-        <Link to="/pro/agenda" className="btn btn--primary">
+        <Link to={`/pro/rdv/${a.id}`} className="btn btn--primary">
           Voir ce rendez-vous côté pro
         </Link>
         <Link to="/" className="btn btn--ghost">

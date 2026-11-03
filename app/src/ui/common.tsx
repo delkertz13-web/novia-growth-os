@@ -44,7 +44,7 @@ export function DemoBanner() {
   const { pathname } = useLocation()
   const isPro = pathname.startsWith('/pro')
   const onReset = () => {
-    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) resetDemo()
+    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) resetDemo()
   }
   return (
     <div className="demo-banner" role="note" aria-label="Démonstration NOVIA — données fictives">
@@ -72,9 +72,9 @@ export function DemoBanner() {
 export const MockBadge = ({ label = 'Mock' }: { label?: string }) => <span className="badge badge--mock">{label}</span>
 export const SimBadge = ({ label = 'Simulation' }: { label?: string }) => <span className="badge badge--sim">{label}</span>
 
-export function StatusPill({ appointment, now }: { appointment: Appointment; now: Date }) {
+export function StatusPill({ appointment, now, compact }: { appointment: Appointment; now: Date; compact?: boolean }) {
   const state = attendanceState(appointment, now)
-  if (state === 'unknown') return <span className="pill pill--unknown">Présence à confirmer</span>
+  if (state === 'unknown') return <span className="pill pill--unknown">{compact ? 'À confirmer' : 'Présence à confirmer'}</span>
   if (state === 'in_progress') return <span className="pill pill--confirmed">En cours</span>
   return <span className={`pill pill--${appointment.status}`}>{statusLabels[appointment.status]}</span>
 }
@@ -92,19 +92,20 @@ export function Photo({
   imageId,
   className = '',
   eager,
-  sizes,
 }: {
   item?: GalleryItem
   imageId?: string
   className?: string
   eager?: boolean
-  sizes?: string
 }) {
   const g = item ?? (imageId ? galleryById(imageId) : undefined)
-  if (g?.src) {
+  // Convention : déposer app/public/demo-media/gallery/<id>.jpg suffit ; `src` dans la config est prioritaire.
+  const src = g ? (g.src ?? `/demo-media/gallery/${g.id}.jpg`) : undefined
+  const [failed, setFailed] = useState(false)
+  if (g && src && !failed) {
     return (
       <div className={`photo ${className}`}>
-        <img src={g.src} alt={g.alt} loading={eager ? 'eager' : 'lazy'} decoding="async" sizes={sizes} />
+        <img src={src} alt={g.alt} loading={eager ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} />
       </div>
     )
   }

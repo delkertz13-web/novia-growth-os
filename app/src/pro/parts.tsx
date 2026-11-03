@@ -26,7 +26,7 @@ export function AppointmentRow({ a, customer, now }: { a: Appointment; customer?
       </div>
       <div className="appt__right">
         <span className="appt__price">{fmt.eur(a.price)}</span>
-        <StatusPill appointment={a} now={now} />
+        <StatusPill appointment={a} now={now} compact />
       </div>
     </Link>
   )

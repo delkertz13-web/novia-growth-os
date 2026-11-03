@@ -99,6 +99,14 @@
     transform: scale(1.08);
   }
 }
+.hero__media .photo__ph-icon {
+  display: none;
+}
+.hero__media .photo__ph-label {
+  inset: 96px var(--gutter) auto auto;
+  justify-content: flex-end;
+  color: rgba(247, 242, 236, 0.75);
+}
 .hero::after {
   content: '';
   position: absolute;
@@ -106,7 +114,7 @@
   z-index: -1;
   background:
     linear-gradient(180deg, rgba(20, 16, 14, 0.5) 0%, rgba(20, 16, 14, 0) 26%),
-    linear-gradient(0deg, rgba(20, 16, 14, 0.86) 0%, rgba(20, 16, 14, 0.45) 42%, rgba(20, 16, 14, 0) 70%);
+    linear-gradient(0deg, rgba(20, 16, 14, 0.9) 0%, rgba(20, 16, 14, 0.62) 45%, rgba(20, 16, 14, 0.12) 78%);
 }
 .hero__content {
   padding-bottom: calc(36px + var(--safe-bottom));
@@ -156,6 +164,7 @@
   gap: 12px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
   padding: 0 var(--gutter) 6px;
   margin: 0 calc(var(--gutter) * -1);
   scrollbar-width: none;
@@ -260,6 +269,7 @@
   gap: 12px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--gutter);
   padding: 0 var(--gutter) 6px;
   margin: 0 calc(var(--gutter) * -1);
   scrollbar-width: none;
@@ -278,6 +288,9 @@
   display: grid;
   gap: 14px;
   align-content: start;
+}
+.review__stars svg {
+  fill: currentColor;
 }
 .review__stars {
   display: flex;
