@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { gallery, galleryById, galleryCategories, lengthLabels, serviceForCategory, shapeLabels } from '../config/content.demo'
 import type { GalleryCategory, NailLength, NailShape } from '../config/schema'
 import { serviceById } from '../config/services.demo'
+import { hasFictionalMedia, provenanceNote } from '../media/media'
 import { Icon } from '../ui/Icon'
 import { Photo, Sheet } from '../ui/common'
 import { ClientFooter } from './ClientLayout'
@@ -36,6 +37,7 @@ export function Gallery() {
           <p className="muted" style={{ margin: 0 }}>
             Formes, longueurs et finitions. Touchez un visuel pour le voir en grand.
           </p>
+          {hasFictionalMedia('gallery') && <p className="provenance-note">{provenanceNote()}</p>}
         </div>
 
         <div className="filters">
@@ -70,7 +72,7 @@ export function Gallery() {
           <div className="masonry">
             {items.map((g) => (
               <button key={g.id} className="masonry__item" onClick={() => setParams({ photo: g.id })}>
-                <Photo item={g} />
+                <Photo item={g} sizes="(min-width: 720px) 33vw, 50vw" />
                 <div className="masonry__cap">{g.title}</div>
               </button>
             ))}
@@ -81,7 +83,7 @@ export function Gallery() {
       <Sheet open={!!open} onClose={close} label={open?.title ?? 'Réalisation'}>
         {open && (
           <div className="viewer">
-            <Photo item={open} eager />
+            <Photo item={open} eager sizes="(min-width: 720px) 560px, 100vw" provenanceBadge />
             <h2 className="display">{open.title}</h2>
             <div className="tags">
               <span className="badge">{galleryCategories.find((c) => c.id === open.category)?.label}</span>

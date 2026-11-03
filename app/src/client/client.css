@@ -408,6 +408,12 @@
   font-size: clamp(40px, 11vw, 64px);
   margin: 8px 0 8px;
 }
+.provenance-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ochre);
+}
 .filters {
   display: grid;
   gap: 10px;

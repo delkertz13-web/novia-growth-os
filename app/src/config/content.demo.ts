@@ -1,10 +1,10 @@
 import type { FaqItem, GalleryCategory, GalleryItem, NailLength, NailShape, ReviewItem } from './schema'
 
 /**
- * GALERIE — emplacements prêts à recevoir de vrais visuels.
- * Déposer les fichiers dans app/public/demo-media/gallery/ puis renseigner `src`
- * (voir app/public/demo-media/gallery/README.md). Sans `src`, un placeholder
- * clairement identifié s'affiche à la place.
+ * GALERIE — 12 emplacements. Chaque `id` correspond à un fichier déposé dans
+ * app/media-source/gallery/<id>.jpg puis traité par `npm run media`
+ * (voir app/media-source/README.md). Sans visuel, un placeholder clairement
+ * identifié s'affiche à la place.
  */
 export const galleryCategories: { id: GalleryCategory; label: string }[] = [
   { id: 'pose-complete', label: 'Pose complète' },

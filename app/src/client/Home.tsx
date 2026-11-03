@@ -4,6 +4,7 @@ import { business } from '../config/business.demo'
 import { gallery, reviews } from '../config/content.demo'
 import { services } from '../config/services.demo'
 import { Icon } from '../ui/Icon'
+import { heroSlots, resolveMedia } from '../media/media'
 import { Photo } from '../ui/common'
 import { ClientFooter, ClientHeader } from './ClientLayout'
 import { HoursCard, ServiceRow } from './parts'
@@ -12,6 +13,7 @@ export function Home() {
   const navigate = useNavigate()
   const heroRef = useRef<HTMLElement>(null)
   const [showCta, setShowCta] = useState(false)
+  const heroIsFictional = resolveMedia([heroSlots.photo, 'g-pose-01'])?.provenance === 'fictif'
 
   useEffect(() => {
     const el = heroRef.current
@@ -25,13 +27,21 @@ export function Home() {
     <main>
       <section className="hero" ref={heroRef}>
         <ClientHeader overlay />
-        <Photo imageId="g-pose-01" className="hero__media" eager />
+        <Photo
+          media={[heroSlots.photo, 'g-pose-01']}
+          alt="Pose d’ongles en gros plan"
+          className="hero__media"
+          priority
+          sizes="100vw"
+          placeholderLabel="Visuel à fournir · photo d’accueil (media-source/hero/hero.jpg)"
+        />
         <div className="wrap hero__content stagger">
           <div className="hero__badges">
             <span className="badge badge--onDark">
               Nail artist · {business.city.value}
             </span>
             <span className="badge badge--onDark">Sur rendez-vous</span>
+            {heroIsFictional && <span className="badge badge--onDark">Visuel fictif</span>}
           </div>
           <h1 className="display hero__title">
             L’art de l’ongle, <em>au millimètre.</em>
@@ -40,10 +50,10 @@ export function Home() {
             Poses gel, french, nail art et semi-permanent. Réservez votre créneau en moins d’une minute.
           </p>
           <div className="hero__ctas">
-            <Link to="/reserver" className="btn btn--light">
+            <Link to="/reserver" viewTransition className="btn btn--light">
               Prendre rendez-vous <Icon name="arrowRight" size={18} />
             </Link>
-            <Link to="/galerie" className="btn btn--onDark">
+            <Link to="/galerie" viewTransition className="btn btn--onDark">
               Voir les réalisations
             </Link>
           </div>
@@ -64,7 +74,7 @@ export function Home() {
           <div className="rail">
             {gallery.slice(0, 8).map((g) => (
               <button key={g.id} className="rail__item" onClick={() => navigate(`/galerie?photo=${g.id}`)}>
-                <Photo item={g} />
+                <Photo item={g} sizes="62vw" />
                 <div className="rail__cap">{g.title}</div>
               </button>
             ))}

@@ -1,7 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { galleryById, galleryCategories, lengthLabels, shapeLabels } from '../config/content.demo'
-import type { GalleryItem } from '../config/schema'
 import { attendanceState, statusLabels } from '../core/appointmentStatus'
 import type { Appointment } from '../core/types'
 import { getState, resetDemo, subscribe } from '../providers/mock/store'
@@ -52,10 +50,10 @@ export function DemoBanner() {
         <span className="demo-banner__tag">DÉMO</span>
         <span className="demo-banner__text">Démonstration NOVIA — données fictives</span>
         <nav className="demo-banner__switch" aria-label="Changer d’espace">
-          <Link to="/" className={!isPro ? 'is-active' : ''}>
+          <Link to="/" viewTransition className={!isPro ? 'is-active' : ''}>
             Cliente
           </Link>
-          <Link to="/pro" className={isPro ? 'is-active' : ''}>
+          <Link to="/pro" viewTransition className={isPro ? 'is-active' : ''}>
             Pro
           </Link>
         </nav>
@@ -79,49 +77,9 @@ export function StatusPill({ appointment, now, compact }: { appointment: Appoint
   return <span className={`pill pill--${appointment.status}`}>{statusLabels[appointment.status]}</span>
 }
 
-/* ---------------- Photo / placeholder ---------------- */
+/* ---------------- Photo ---------------- */
 
-const categoryLabel = (id: GalleryItem['category']) => galleryCategories.find((c) => c.id === id)?.label ?? ''
-
-/**
- * Visuel réel si `src` est renseigné dans la configuration,
- * sinon emplacement temporaire clairement identifié.
- */
-export function Photo({
-  item,
-  imageId,
-  className = '',
-  eager,
-}: {
-  item?: GalleryItem
-  imageId?: string
-  className?: string
-  eager?: boolean
-}) {
-  const g = item ?? (imageId ? galleryById(imageId) : undefined)
-  // Convention : déposer app/public/demo-media/gallery/<id>.jpg suffit ; `src` dans la config est prioritaire.
-  const src = g ? (g.src ?? `/demo-media/gallery/${g.id}.jpg`) : undefined
-  const [failed, setFailed] = useState(false)
-  if (g && src && !failed) {
-    return (
-      <div className={`photo ${className}`}>
-        <img src={src} alt={g.alt} loading={eager ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} />
-      </div>
-    )
-  }
-  return (
-    <div className={`photo photo--ph ${className}`} role="img" aria-label={g ? `Emplacement photo : ${g.alt}` : 'Emplacement photo'}>
-      <Icon name="camera" size={26} className="photo__ph-icon" />
-      {g && (
-        <div className="photo__ph-label">
-          <span>
-            Visuel à fournir · {categoryLabel(g.category)} · {shapeLabels[g.shape]} {lengthLabels[g.length].toLowerCase()}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
+export { Photo } from './Photo'
 
 /* ---------------- Feuille ---------------- */
 

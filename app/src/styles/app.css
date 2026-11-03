@@ -37,6 +37,37 @@
   --gutter: 20px;
   --maxw: 1120px;
   --banner-h: 34px;
+
+  /* ---- V2 · Profondeur : 4 plans (scène, surface, carte flottante, premier plan) ---- */
+  --elev-0: none;
+  --elev-1: 0 1px 1px rgba(29, 25, 22, 0.06), 0 2px 8px -2px rgba(29, 25, 22, 0.08);
+  --elev-2: 0 1px 2px rgba(29, 25, 22, 0.08), 0 10px 28px -10px rgba(29, 25, 22, 0.22);
+  --elev-3: 0 2px 4px rgba(12, 9, 8, 0.12), 0 24px 56px -18px rgba(12, 9, 8, 0.45);
+  --perspective: 1200px;
+
+  /* ---- V2 · Scènes « atelier » (accueil, galerie, réalisation ouverte) ---- */
+  --scene: #15110f;
+  --scene-2: #221b17;
+  --on-scene: #f4efe9;
+  --on-scene-muted: rgba(244, 239, 233, 0.66);
+  --on-scene-line: rgba(244, 239, 233, 0.16);
+  --glass: rgba(26, 20, 17, 0.46);
+  --glass-line: rgba(244, 239, 233, 0.18);
+
+  /* ---- V2 · Mouvement : 4 durées, 2 courbes ---- */
+  --dur-1: 120ms; /* pression */
+  --dur-2: 240ms; /* changement d'état */
+  --dur-3: 420ms; /* déplacement, transition partagée */
+  --dur-4: 700ms; /* scène */
+  --ease-out: var(--ease);
+  --ease-spring: var(--ease);
+}
+
+/* Ressort léger (dépassement ~4 %) pour les objets que l'on pose. Safari 17.2+. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-spring: linear(0, 0.06 3%, 0.25 8%, 0.53 15%, 0.8 23%, 0.97 32%, 1.03 40%, 1.04 47%, 1.02 58%, 1 72%, 1);
+  }
 }
 
 *,
@@ -374,6 +405,58 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: var(--focal, 50% 50%);
+}
+.photo picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Visuel du pipeline : couleur dominante, puis aperçu flou, puis image nette. */
+.photo--media {
+  background: var(--tone, var(--shell));
+}
+.photo--media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--lqip) var(--focal, 50% 50%) / cover no-repeat;
+  filter: blur(14px);
+  transform: scale(1.12);
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+.photo--media img {
+  position: relative;
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+.photo--media.is-loaded img {
+  opacity: 1;
+}
+.photo--media.is-loaded::before {
+  opacity: 0;
+}
+.photo--media[data-alpha] {
+  background: transparent;
+}
+.photo--media[data-alpha]::before {
+  display: none;
+}
+.photo__prov {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 99px;
+  color: var(--on-scene);
+  background: rgba(20, 16, 14, 0.5);
+  pointer-events: none;
 }
 .photo--ph {
   background:
@@ -546,6 +629,67 @@ a {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------- V2 · Utilitaires de profondeur ---------------- */
+
+.scene {
+  background: var(--scene);
+  color: var(--on-scene);
+}
+.scene .muted,
+.scene .eyebrow {
+  color: var(--on-scene-muted);
+}
+.scene .photo--ph {
+  background:
+    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.08), transparent 60%),
+    linear-gradient(160deg, var(--scene-2), var(--scene));
+}
+.scene .photo__ph-label,
+.scene .photo__ph-icon {
+  color: var(--on-scene-muted);
+}
+.depth {
+  perspective: var(--perspective);
+  transform-style: preserve-3d;
+}
+.float {
+  box-shadow: var(--elev-3);
+}
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.pressable {
+  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+.pressable:active {
+  transform: scale(0.98);
+}
+
+/* ---------------- V2 · Transitions de vue (Safari 18+) ---------------- */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-2);
+  animation-timing-function: var(--ease-out);
+}
+/* Le bandeau DÉMO ne participe pas aux transitions : il reste en place. */
+.demo-banner {
+  view-transition-name: demo-banner;
+}
+::view-transition-group(demo-banner) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 

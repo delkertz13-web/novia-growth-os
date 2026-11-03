@@ -1,0 +1,8 @@
+{
+  "provenance": "fictif",
+  "provenanceNote": "Visuels fictifs créés pour la démonstration NOVIA. Ce ne sont pas des réalisations du salon.",
+  "items": {
+    "hero": { "focal": [0.5, 0.45] },
+    "hero-cutout": { "focal": [0.5, 0.45] }
+  }
+}
