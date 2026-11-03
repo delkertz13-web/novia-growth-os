@@ -23,3 +23,7 @@ Développer ici une démo web autonome comprenant espace cliente, réservation s
 Choix technique justifié, procédure réelle de lancement, fichiers de configuration, inventaire des mocks, limites, résultat du build et des vérifications. Ne pas ajouter aujourd'hui des commandes `npm` ou autres supposant un framework non choisi.
 
 État actuel : documentation SPECIFIED ; démo non MOCKED, non IMPLEMENTED, non TESTED, non CONNECTED, non PRODUCTION READY.
+
+## Mise à jour du 3 novembre 2026
+
+Le développement a été autorisé par le propriétaire. Le code de la démo vit dans `app/` à la racine du dépôt (voir `app/README.md`). Premier jalon : parcours cliente (accueil → réservation → confirmation) et parcours professionnelle (dashboard → validation → action NOVIA → SmartFill / récupération → Revenue), tout en mocks.
