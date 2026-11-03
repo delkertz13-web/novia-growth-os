@@ -195,7 +195,8 @@
   top: 0;
 }
 .hero2__content {
-  padding-bottom: calc(26px + var(--safe-bottom));
+  /* 28 px recouverts par le bord arrondi de la feuille, + respiration. */
+  padding-bottom: calc(46px + var(--safe-bottom));
 }
 .hero2__badges {
   display: flex;
@@ -373,24 +374,51 @@
   }
 }
 
-/* Très petits écrans (iPhone SE 1re génération) : le bouton passe sous le créneau. */
-@media (max-width: 359px) {
-  .hero2__card {
-    flex-wrap: wrap;
-    padding: 12px;
-  }
-  .hero2__slot {
-    padding-left: 6px;
-  }
-  .hero2__book {
-    flex: 1 1 100%;
-  }
-}
-
-/* Écrans courts (iPhone SE, Safari barres déployées) : on garde l'essentiel. */
+/*
+ * Petits écrans : la carte reste sur une ligne et ne dépasse pas ~11 % de la hauteur.
+ * Bouton à 48 px de haut (zone tactile > 44 px), hiérarchie inchangée.
+ */
 @media (max-height: 700px) and (max-width: 719px) {
   .hero2__lead {
     display: none;
+  }
+  .hero2__title {
+    margin-bottom: 10px;
+  }
+  .hero2__badges {
+    margin-bottom: 12px;
+  }
+  .hero2__card {
+    gap: 10px;
+    padding: 7px 7px 7px 16px;
+    border-radius: 22px;
+  }
+  .hero2__slot-label {
+    font-size: 9.5px;
+  }
+  .hero2__slot-value {
+    font-size: 17px;
+  }
+  .hero2__book {
+    --h: 48px;
+    padding: 0 18px;
+    font-size: 15px;
+  }
+  .hero2__more {
+    margin-top: 8px;
+  }
+  .hero2__content {
+    padding-bottom: calc(38px + var(--safe-bottom));
+  }
+}
+/* Très étroit (iPhone SE 1re génération, 320 px) : on retire le jour et la flèche, pas le contenu. */
+@media (max-width: 359px) {
+  .hero2__slot-day,
+  .hero2__book-icon {
+    display: none;
+  }
+  .hero2__book {
+    padding: 0 16px;
   }
 }
 

@@ -143,10 +143,19 @@ export function Hero({ onPassed }: { onPassed?: (passed: boolean) => void }) {
           <div className="hero2__card glass">
             <div className="hero2__slot">
               <span className="hero2__slot-label">{slot ? 'Prochain créneau' : 'En moins d’une minute'}</span>
-              <span className="hero2__slot-value">{slot ? `${capitalize(fmt.dayShort(slot))} · ${fmt.time(slot)}` : 'Choisissez votre créneau'}</span>
+              <span className="hero2__slot-value">
+                {slot ? (
+                  <>
+                    <span className="hero2__slot-day">{capitalize(slot.toLocaleDateString('fr-FR', { weekday: 'short' }))} </span>
+                    {slot.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {fmt.time(slot)}
+                  </>
+                ) : (
+                  'Choisissez votre créneau'
+                )}
+              </span>
             </div>
             <Link to="/reserver" viewTransition className="btn btn--lacquer hero2__book">
-              Réserver <Icon name="arrowRight" size={18} />
+              Réserver <Icon name="arrowRight" size={18} className="hero2__book-icon" />
             </Link>
           </div>
           <Link to="/galerie" viewTransition className="hero2__more">
