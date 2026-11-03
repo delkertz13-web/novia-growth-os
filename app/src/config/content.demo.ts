@@ -31,18 +31,18 @@ export const lengthLabels: Record<NailLength, string> = {
 }
 
 export const gallery: GalleryItem[] = [
-  { id: 'g-pose-01', title: 'Pose complète laiteuse', category: 'pose-complete', shape: 'amande', length: 'longue', alt: 'Pose complète gel, forme amande longue, teinte laiteuse' },
-  { id: 'g-french-01', title: 'French fine', category: 'french', shape: 'amande', length: 'moyenne', alt: 'French manucure fine sur forme amande moyenne' },
-  { id: 'g-nude-01', title: 'Nude rosé', category: 'nude', shape: 'ovale', length: 'courte', alt: 'Ongles courts ovales, vernis nude rosé' },
-  { id: 'g-art-01', title: 'Ligne graphique', category: 'nail-art', shape: 'carree', length: 'moyenne', alt: 'Nail art minimaliste à lignes graphiques, forme carrée' },
-  { id: 'g-gel-01', title: 'Gel bordeaux', category: 'gel', shape: 'ballerine', length: 'longue', alt: 'Gel bordeaux brillant, forme ballerine longue' },
-  { id: 'g-semi-01', title: 'Semi-permanent rouge', category: 'semi-permanent', shape: 'squoval', length: 'courte', alt: 'Semi-permanent rouge classique sur ongles courts squoval' },
-  { id: 'g-french-02', title: 'French colorée', category: 'french', shape: 'carree', length: 'courte', alt: 'French colorée sur ongles carrés courts' },
-  { id: 'g-art-02', title: 'Chrome perlé', category: 'nail-art', shape: 'stiletto', length: 'longue', alt: 'Effet chrome perlé sur stiletto long' },
-  { id: 'g-pose-02', title: 'Pose sculptée', category: 'pose-complete', shape: 'ballerine', length: 'moyenne', alt: 'Pose sculptée, forme ballerine moyenne' },
-  { id: 'g-nude-02', title: 'Nude baby boomer', category: 'nude', shape: 'amande', length: 'moyenne', alt: 'Dégradé baby boomer nude, forme amande' },
-  { id: 'g-gel-02', title: 'Gel transparent', category: 'gel', shape: 'ovale', length: 'moyenne', alt: 'Gel transparent effet naturel, forme ovale' },
-  { id: 'g-semi-02', title: 'Semi-permanent caramel', category: 'semi-permanent', shape: 'ovale', length: 'courte', alt: 'Semi-permanent caramel sur ongles courts' },
+  { id: 'g-pose-01', title: 'French blanche', category: 'french', shape: 'amande', length: 'longue', alt: 'French blanche classique sur ongles amande longs, base nude' },
+  { id: 'g-pose-02', title: 'Bordeaux filets d’or', category: 'gel', shape: 'stiletto', length: 'longue', alt: 'Gel bordeaux brillant, un ongle orné de fins filets dorés' },
+  { id: 'g-pose-03', title: 'Nude rosé feuille d’or', category: 'pose-complete', shape: 'amande', length: 'longue', alt: 'Pose complète nude rosé, éclats de feuille d’or sur deux ongles' },
+  { id: 'g-pose-04', title: 'Chrome perlé', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Effet chrome perlé rosé sur ongles amande longs' },
+  { id: 'g-pose-05', title: 'Caramel & feuillage', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base caramel, feuillage blanc peint à main levée et ongle pailleté' },
+  { id: 'g-pose-06', title: 'Fleur sculptée', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Rose poudré, fleur en relief et fins motifs dorés' },
+  { id: 'g-pose-07', title: 'Baby boomer', category: 'nude', shape: 'amande', length: 'longue', alt: 'Dégradé baby boomer du rose nude au blanc laiteux' },
+  { id: 'g-pose-08', title: 'Léopard nude', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Motif léopard noir et caramel sur base nude' },
+  { id: 'g-pose-09', title: 'Strass & paillettes', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base rosée transparente, strass et paillettes argentées' },
+  { id: 'g-pose-10', title: 'Vieux rose', category: 'semi-permanent', shape: 'amande', length: 'moyenne', alt: 'Semi-permanent vieux rose uni et brillant' },
+  { id: 'g-pose-11', title: 'French noire liseré or', category: 'french', shape: 'stiletto', length: 'longue', alt: 'French noire soulignée d’un liseré doré sur base nude' },
+  { id: 'g-pose-12', title: 'Bordeaux & or', category: 'gel', shape: 'amande', length: 'longue', alt: 'Gel bordeaux, ongle feuille d’or et ongle pailleté doré' },
 ]
 
 export const galleryById = (id: string) => gallery.find((g) => g.id === id)

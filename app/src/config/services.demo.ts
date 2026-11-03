@@ -14,7 +14,7 @@ export const services: ServiceConfig[] = [
     category: 'pose',
     returnRecommendedAfterDays: 21,
     active: true,
-    coverImageId: 'g-pose-01',
+    coverImageId: 'g-pose-03',
   },
   {
     id: 'remplissage',
@@ -26,7 +26,7 @@ export const services: ServiceConfig[] = [
     category: 'entretien',
     returnRecommendedAfterDays: 21,
     active: true,
-    coverImageId: 'g-gel-01',
+    coverImageId: 'g-pose-07',
   },
   {
     id: 'semi-permanent',
@@ -38,7 +38,7 @@ export const services: ServiceConfig[] = [
     category: 'semi-permanent',
     returnRecommendedAfterDays: 18,
     active: true,
-    coverImageId: 'g-semi-01',
+    coverImageId: 'g-pose-10',
   },
   {
     id: 'nail-art',
@@ -50,7 +50,7 @@ export const services: ServiceConfig[] = [
     category: 'nail-art',
     returnRecommendedAfterDays: null,
     active: true,
-    coverImageId: 'g-art-01',
+    coverImageId: 'g-pose-06',
   },
   {
     id: 'depose',
@@ -62,7 +62,7 @@ export const services: ServiceConfig[] = [
     category: 'depose',
     returnRecommendedAfterDays: null,
     active: true,
-    coverImageId: 'g-nude-01',
+    coverImageId: 'g-pose-12',
   },
   {
     id: 'depose-pose',
@@ -74,7 +74,7 @@ export const services: ServiceConfig[] = [
     category: 'pose',
     returnRecommendedAfterDays: 21,
     active: true,
-    coverImageId: 'g-french-01',
+    coverImageId: 'g-pose-01',
   },
 ]
 
