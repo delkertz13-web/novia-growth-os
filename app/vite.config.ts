@@ -16,10 +16,12 @@ function preloadHero(): Plugin {
       const a = assets.hero ?? assets['g-pose-01']
       if (!a) return []
       const set = a.widths.map((w) => `/media/${a.id}.${a.hash}-${w}.avif ${w}w`).join(', ')
+      // Préchargé seulement sur l'accueil : ailleurs, l'image du Hero n'est pas affichée.
+      const attrs = { rel: 'preload', as: 'image', type: 'image/avif', imageSrcset: set, imageSizes: '100vw', fetchPriority: 'high' }
       return [
         {
-          tag: 'link',
-          attrs: { rel: 'preload', as: 'image', type: 'image/avif', imagesrcset: set, imagesizes: '100vw', fetchpriority: 'high' },
+          tag: 'script',
+          children: `if(location.pathname==='/'){var l=document.createElement('link');Object.assign(l,${JSON.stringify(attrs)});document.head.appendChild(l)}`,
           injectTo: 'head',
         },
       ]
