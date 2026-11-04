@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { business } from '../config/business.demo'
 import { galleryById } from '../config/content.demo'
+import type { GalleryItem } from '../config/schema'
+import { resolveMedia } from '../media/media'
 import { serviceById } from '../config/services.demo'
 import type { Appointment } from '../core/types'
 import { providers } from '../providers/mock'
@@ -26,6 +28,7 @@ export function Booking() {
 
   const preset = params.get('service')
   const inspiration = params.get('inspiration')
+  const inspo = inspiration ? galleryById(inspiration) : undefined
   const [serviceId, setServiceId] = useState<string | null>(preset && serviceById(preset) ? preset : null)
   const [step, setStep] = useState<Step>(serviceId ? 'when' : 'service')
   const [day, setDay] = useState<Date | null>(null)
@@ -112,6 +115,7 @@ export function Booking() {
       </div>
 
       <div className="wrap flow__body page" key={step}>
+        {inspo && step !== 'service' && <Inspiration item={inspo} />}
         {step === 'service' && (
           <>
             <h1 className="display flow__title">Quelle séance ?</h1>
@@ -147,7 +151,6 @@ export function Booking() {
             <h1 className="display flow__title">Quand ?</h1>
             <p className="flow__lead">
               {service.name} · {fmt.duration(service.durationMin)}
-              {inspiration && galleryById(inspiration) ? ` · inspiration « ${galleryById(inspiration)!.title} »` : ''}
             </p>
             <div className="days" role="listbox" aria-label="Jour">
               {days.map(({ date, count }) => {
@@ -312,5 +315,22 @@ function Confirmation({ appointment: a }: { appointment: Appointment }) {
         </Link>
       </div>
     </main>
+  )
+}
+
+/** Pose choisie dans la galerie : elle reste en tête de la réservation (transition continue depuis la visionneuse). */
+function Inspiration({ item }: { item: GalleryItem }) {
+  const fictional = resolveMedia(item.id)?.provenance === 'fictif'
+  return (
+    <div className="inspo">
+      <div className="inspo__media" style={{ viewTransitionName: 'pose' } as CSSProperties}>
+        <Photo item={item} eager sizes="64px" />
+      </div>
+      <div className="inspo__text">
+        <span className="inspo__label">Votre inspiration</span>
+        <span className="inspo__title">{item.title}</span>
+        <span className="inspo__hint">{fictional ? 'Visuel fictif, à titre d’inspiration' : 'À titre d’inspiration'}</span>
+      </div>
+    </div>
   )
 }

@@ -32,16 +32,16 @@ export const lengthLabels: Record<NailLength, string> = {
 
 export const gallery: GalleryItem[] = [
   { id: 'g-pose-01', title: 'French blanche', category: 'french', shape: 'amande', length: 'longue', alt: 'French blanche classique sur ongles amande longs, base nude' },
-  { id: 'g-pose-02', title: 'Bordeaux filets d’or', category: 'gel', shape: 'stiletto', length: 'longue', alt: 'Gel bordeaux brillant, un ongle orné de fins filets dorés' },
-  { id: 'g-pose-03', title: 'Nude rosé feuille d’or', category: 'pose-complete', shape: 'amande', length: 'longue', alt: 'Pose complète nude rosé, éclats de feuille d’or sur deux ongles' },
-  { id: 'g-pose-04', title: 'Chrome perlé', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Effet chrome perlé rosé sur ongles amande longs' },
-  { id: 'g-pose-05', title: 'Caramel & feuillage', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base caramel, feuillage blanc peint à main levée et ongle pailleté' },
-  { id: 'g-pose-06', title: 'Fleur sculptée', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Rose poudré, fleur en relief et fins motifs dorés' },
+  { id: 'g-pose-02', title: 'Bordeaux filets d’or', category: 'gel', shape: 'amande', length: 'longue', alt: 'Gel bordeaux brillant, un ongle orné de fins filets dorés en volute' },
+  { id: 'g-pose-03', title: 'Marbré rosé & feuille d’or', category: 'pose-complete', shape: 'amande', length: 'longue', alt: 'Pose complète nude rosé, effet marbré laiteux et éclats de feuille d’or' },
+  { id: 'g-pose-04', title: 'Chrome opale', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Effet chrome rose opalescent aux reflets nacrés sur ongles amande longs' },
+  { id: 'g-pose-05', title: 'Nude mat & feuillage', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base nude mat, feuillage blanc peint à main levée et un ongle pailleté or' },
+  { id: 'g-pose-06', title: 'Fleurs sculptées', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Rose poudré, fleurs en relief et fines tiges dorées' },
   { id: 'g-pose-07', title: 'Baby boomer', category: 'nude', shape: 'amande', length: 'longue', alt: 'Dégradé baby boomer du rose nude au blanc laiteux' },
-  { id: 'g-pose-08', title: 'Léopard nude', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Motif léopard noir et caramel sur base nude' },
-  { id: 'g-pose-09', title: 'Strass & paillettes', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base rosée transparente, strass et paillettes argentées' },
-  { id: 'g-pose-10', title: 'Vieux rose', category: 'semi-permanent', shape: 'amande', length: 'moyenne', alt: 'Semi-permanent vieux rose uni et brillant' },
-  { id: 'g-pose-11', title: 'French noire liseré or', category: 'french', shape: 'stiletto', length: 'longue', alt: 'French noire soulignée d’un liseré doré sur base nude' },
+  { id: 'g-pose-08', title: 'Léopard nude & or', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Motif léopard sur base nude, souligné d’un filet doré' },
+  { id: 'g-pose-09', title: 'Strass & filet d’or', category: 'nail-art', shape: 'amande', length: 'longue', alt: 'Base rosée transparente, petits strass et fin filet doré' },
+  { id: 'g-pose-10', title: 'Vieux rose', category: 'semi-permanent', shape: 'amande', length: 'longue', alt: 'Vieux rose brillant, un ongle orné d’une branche dorée et d’un strass' },
+  { id: 'g-pose-11', title: 'French noire liseré or', category: 'french', shape: 'amande', length: 'longue', alt: 'French noire soulignée d’un liseré doré sur base nude, un ongle orné de strass' },
   { id: 'g-pose-12', title: 'Bordeaux & or', category: 'gel', shape: 'amande', length: 'longue', alt: 'Gel bordeaux, ongle feuille d’or et ongle pailleté doré' },
 ]
 

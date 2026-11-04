@@ -2,9 +2,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { business } from '../config/business.demo'
 import './client.css'
 
-export function ClientHeader({ overlay = false }: { overlay?: boolean }) {
+export function ClientHeader({ overlay = false, scene = false }: { overlay?: boolean; scene?: boolean }) {
   return (
-    <header className={`c-header ${overlay ? 'c-header--overlay' : ''}`}>
+    <header className={`c-header ${overlay ? 'c-header--overlay' : ''} ${scene ? 'c-header--scene' : ''}`}>
       <div className="wrap c-header__row">
         <NavLink to="/" viewTransition className="brand" aria-label={`${business.name.value} — accueil`}>
           {business.name.value}
@@ -28,9 +28,10 @@ export function ClientLayout() {
   const { pathname } = useLocation()
   const isHome = pathname === '/'
   const isFlow = pathname.startsWith('/reserver')
+  const isScene = pathname.startsWith('/galerie')
   return (
     <>
-      {!isHome && !isFlow && <ClientHeader />}
+      {!isHome && !isFlow && <ClientHeader scene={isScene} />}
       <Outlet />
     </>
   )

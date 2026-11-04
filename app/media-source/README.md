@@ -14,18 +14,18 @@ npm run build    # ou relancer npm run dev
 |---|---|
 | `hero/hero.jpg` | Photo d'accueil plein écran (scène de fond) |
 | `hero/hero-cutout.png` | La même photo, **main / sujet détouré sur fond transparent**, exactement au même cadrage et à la même taille que `hero.jpg` (plan de profondeur du Hero) |
-| `gallery/g-pose-01.jpg` | Pose complète laiteuse · amande longue |
-| `gallery/g-french-01.jpg` | French fine · amande moyenne |
-| `gallery/g-nude-01.jpg` | Nude rosé · ovale courte |
-| `gallery/g-art-01.jpg` | Ligne graphique · carrée moyenne |
-| `gallery/g-gel-01.jpg` | Gel bordeaux · ballerine longue |
-| `gallery/g-semi-01.jpg` | Semi-permanent rouge · squoval courte |
-| `gallery/g-french-02.jpg` | French colorée · carrée courte |
-| `gallery/g-art-02.jpg` | Chrome perlé · stiletto longue |
-| `gallery/g-pose-02.jpg` | Pose sculptée · ballerine moyenne |
-| `gallery/g-nude-02.jpg` | Nude baby boomer · amande moyenne |
-| `gallery/g-gel-02.jpg` | Gel transparent · ovale moyenne |
-| `gallery/g-semi-02.jpg` | Semi-permanent caramel · ovale courte |
+| `gallery/g-pose-01.jpg` | French blanche · amande longue |
+| `gallery/g-pose-02.jpg` | Bordeaux filets d’or · amande longue |
+| `gallery/g-pose-03.jpg` | Marbré rosé & feuille d’or · amande longue |
+| `gallery/g-pose-04.jpg` | Chrome opale · amande longue |
+| `gallery/g-pose-05.jpg` | Nude mat & feuillage · amande longue |
+| `gallery/g-pose-06.jpg` | Fleurs sculptées · amande longue |
+| `gallery/g-pose-07.jpg` | Baby boomer · amande longue |
+| `gallery/g-pose-08.jpg` | Léopard nude & or · amande longue |
+| `gallery/g-pose-09.jpg` | Strass & filet d’or · amande longue |
+| `gallery/g-pose-10.jpg` | Vieux rose · amande longue |
+| `gallery/g-pose-11.jpg` | French noire liseré or · amande longue |
+| `gallery/g-pose-12.jpg` | Bordeaux & or · amande longue |
 
 Formats acceptés : JPEG, PNG, WebP, AVIF, TIFF. Le nom du fichier (sans extension) doit être exactement l'identifiant. Titres, catégories, formes et longueurs se modifient dans `src/config/content.demo.ts`.
 

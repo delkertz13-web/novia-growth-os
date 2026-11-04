@@ -39,6 +39,27 @@ export function withViewTransition(update: () => void) {
   doc.startViewTransition(() => flushSync(update))
 }
 
+type ViewTransitionLike = { finished: Promise<void> }
+
+/**
+ * Variante pour les mises à jour qui gèrent elles-mêmes leur synchronisation
+ * (navigation React Router avec `flushSync`, ou promesse résolue une fois le DOM à jour).
+ * Renvoie la transition, ou `undefined` si elle n'a pas lieu (mise à jour appliquée directement).
+ */
+export function runViewTransition(update: () => void | Promise<void>): ViewTransitionLike | undefined {
+  const doc =
+    typeof document !== 'undefined'
+      ? (document as Document & { startViewTransition?: (cb: () => void | Promise<void>) => ViewTransitionLike })
+      : undefined
+  if (!doc?.startViewTransition || prefersReducedMotion()) {
+    void update()
+    return undefined
+  }
+  const t = doc.startViewTransition(update)
+  t.finished.catch(() => {})
+  return t
+}
+
 /* ---------------- Progression au scroll ---------------- */
 
 /**
