@@ -1,0 +1,617 @@
+/* ============ Réservation V2 — continuité de la pose, sobriété, confiance ============ */
+
+/* ---------- Étapes : glissement court selon le sens de navigation ---------- */
+
+.flow__step {
+  animation: step-in-fwd var(--dur-3) var(--ease-out) both;
+}
+.flow__step[data-dir='back'] {
+  animation-name: step-in-back;
+}
+@keyframes step-in-fwd {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+}
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0);
+  }
+}
+
+/* ---------- Ce que l'on réserve (pose ou prestation) ---------- */
+
+.flow__subject {
+  padding-top: 16px;
+}
+.flow__subject + .flow__body {
+  padding-top: 16px;
+}
+.chosen {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--elev-1);
+  transition:
+    padding var(--dur-3) var(--ease-out),
+    gap var(--dur-3) var(--ease-out),
+    border-radius var(--dur-3) var(--ease-out),
+    background var(--dur-3) var(--ease-out),
+    color var(--dur-3) var(--ease-out);
+}
+/* Grande et en scène au moment de choisir la date : on voit ce que l'on réserve. */
+.chosen--inspo.chosen--lg {
+  background: var(--scene);
+  border-color: transparent;
+  color: var(--on-scene);
+  box-shadow: var(--elev-3);
+}
+.chosen__media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 92px;
+  height: 122px;
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    width var(--dur-3) var(--ease-out),
+    height var(--dur-3) var(--ease-out),
+    border-radius var(--dur-3) var(--ease-out);
+}
+.chosen__media .photo {
+  position: absolute;
+  inset: 0;
+}
+.chosen__media .photo__ph-label {
+  display: none;
+}
+.chosen__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.chosen__label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chosen--inspo.chosen--lg .chosen__label,
+.chosen--inspo.chosen--lg .chosen__sub {
+  color: var(--on-scene-muted);
+}
+.chosen__title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  transition: font-size var(--dur-3) var(--ease-out);
+}
+.chosen__sub {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.chosen__prov {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--ochre);
+}
+.chosen--inspo.chosen--lg .chosen__prov {
+  color: #d8b98a;
+}
+/* Plus discrète aux coordonnées… */
+.chosen--md {
+  padding: 10px;
+}
+.chosen--md .chosen__media {
+  width: 56px;
+  height: 74px;
+  border-radius: 12px;
+}
+.chosen--md .chosen__title {
+  font-size: 19px;
+}
+.chosen--md .chosen__prov {
+  display: none;
+}
+/* …puis simple rappel au récapitulatif. */
+.chosen--sm {
+  padding: 8px 12px 8px 8px;
+  gap: 12px;
+  box-shadow: none;
+  border-radius: var(--r-md);
+}
+.chosen--sm .chosen__media {
+  width: 40px;
+  height: 52px;
+  border-radius: 10px;
+}
+.chosen--sm .chosen__title {
+  font-size: 17px;
+}
+.chosen--sm .chosen__sub,
+.chosen--sm .chosen__prov {
+  display: none;
+}
+
+/* ---------- Date et créneaux ---------- */
+
+.day {
+  min-height: 84px;
+  height: auto;
+}
+.day:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.day--closed,
+.day--full {
+  background: transparent;
+  border-style: dashed;
+}
+.day:disabled {
+  opacity: 0.45;
+}
+.when__day {
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+.when__slots {
+  animation: fade-in var(--dur-2) var(--ease-out);
+}
+.slot-group h3 small {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+.slot {
+  min-height: 48px;
+  height: auto;
+}
+.slot:active {
+  transform: scale(0.96);
+}
+.slot.is-selected {
+  box-shadow: 0 8px 18px -10px rgba(110, 42, 44, 0.8);
+  transition:
+    background var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-spring),
+    box-shadow var(--dur-2) var(--ease-out);
+}
+
+/* ---------- Pied de parcours ---------- */
+
+.flow__sum {
+  animation: fade-in var(--dur-2) var(--ease-out);
+}
+.flow__footer .btn {
+  min-width: 148px;
+}
+.btn.is-sending {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+/* ---------- Récapitulatif ---------- */
+
+.recap--v2 {
+  gap: 14px;
+}
+.recap--v2 .recap__row {
+  align-items: baseline;
+}
+.recap__inspo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.recap__inspo-media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.recap__inspo-media .photo {
+  position: absolute;
+  inset: 0;
+}
+.recap__inspo div:last-child {
+  display: grid;
+}
+.recap__k {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.recap__inspo strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 19px;
+}
+.recap__edit {
+  display: block;
+  margin: 0;
+  padding: 4px 0 2px;
+  min-height: 28px;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--lacquer);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.recap__money {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.recap__money .recap__total {
+  border: 0;
+  padding: 0;
+}
+.recap__money .recap__total span:last-child {
+  font-size: 20px;
+}
+.trust {
+  list-style: none;
+  margin: 16px 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.trust li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trust svg {
+  color: var(--sage);
+  flex: 0 0 auto;
+}
+
+/* ---------- Confirmation ---------- */
+
+.done2 {
+  max-width: 520px;
+  padding-top: 34px;
+  padding-bottom: calc(48px + var(--safe-bottom));
+  text-align: center;
+}
+.done2__title:focus {
+  outline: none;
+}
+
+/* Le sceau : disque laqué qui se pose, anneau tracé, coche, onde unique. */
+.seal {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  background: var(--lacquer);
+  box-shadow: 0 18px 40px -16px rgba(110, 42, 44, 0.75);
+  animation: seal-in 0.6s var(--ease-spring) both;
+}
+.seal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--lacquer);
+  opacity: 0;
+  animation: seal-bloom 0.9s 0.5s var(--ease-out) both;
+  pointer-events: none;
+}
+.seal svg {
+  display: block;
+  fill: none;
+  stroke: #fbf3f0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.seal__ring {
+  stroke-width: 1.5;
+  opacity: 0.45;
+  stroke-dasharray: 277;
+  stroke-dashoffset: 277;
+  transform: rotate(-90deg);
+  transform-origin: 52px 52px;
+  animation: seal-draw 0.7s 0.15s var(--ease-out) forwards;
+}
+.seal__check {
+  stroke-width: 4;
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: seal-draw 0.4s 0.55s var(--ease-out) forwards;
+}
+@keyframes seal-in {
+  from {
+    transform: scale(0.55);
+    opacity: 0;
+  }
+}
+@keyframes seal-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes seal-bloom {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+.done2__eyebrow,
+.done2__title,
+.done2__when,
+.ticket,
+.next,
+.done2__actions {
+  animation: rise 0.6s var(--ease-out) both;
+}
+.done2__eyebrow {
+  animation-delay: 0.6s;
+}
+.done2__title {
+  font-size: clamp(42px, 12vw, 64px);
+  margin: 8px 0 10px;
+  animation-delay: 0.68s;
+}
+.done2__when {
+  margin: 0 0 24px;
+  color: var(--ink-2);
+  font-size: 16px;
+  line-height: 1.5;
+  animation-delay: 0.76s;
+}
+.done2__when strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ticket {
+  position: relative;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-2);
+  animation-delay: 0.86s;
+}
+.ticket__inspo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.ticket__inspo-media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 58px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ticket__inspo-media .photo {
+  position: absolute;
+  inset: 0;
+}
+.ticket__inspo > div:last-child {
+  display: grid;
+}
+.ticket__k {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ticket__inspo strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+}
+.ticket__rows {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+/* Talon détachable : bord pointillé et encoches. */
+.ticket__ref {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1.5px dashed var(--line-strong);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ticket__ref::before,
+.ticket__ref::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--porcelain);
+  border: 1px solid var(--line);
+}
+.ticket__ref::before {
+  left: -9px;
+}
+.ticket__ref::after {
+  right: -9px;
+}
+.ticket__ref code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+/* Ce que NOVIA fait ensuite */
+.next {
+  margin: 18px 0 22px;
+  padding: 18px;
+  text-align: left;
+  border-radius: var(--r-lg);
+  background: var(--scene);
+  color: var(--on-scene);
+  animation-delay: 1s;
+}
+.next__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.next .eyebrow {
+  color: var(--on-scene-muted);
+}
+.next__demo {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--on-scene-line);
+}
+.next__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+.next__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 0 0 16px;
+}
+.next__item:last-child {
+  padding-bottom: 0;
+}
+/* fil entre les étapes */
+.next__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 10.5px;
+  top: 24px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--on-scene-line);
+}
+.next__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--on-scene-line);
+  color: var(--scene);
+  animation: next-on 0.35s var(--ease-spring) both;
+}
+.next__item:nth-child(1) .next__dot {
+  animation-delay: 1.2s;
+}
+.next__item:nth-child(2) .next__dot {
+  animation-delay: 1.35s;
+}
+.next__item:nth-child(3) .next__dot {
+  animation-delay: 1.5s;
+}
+.next__item.is-done .next__dot {
+  background: #a8c5ad;
+  border-color: #a8c5ad;
+}
+.next__item.is-scheduled .next__dot {
+  background: var(--on-scene);
+  border-color: var(--on-scene);
+}
+.next__item.is-skipped {
+  opacity: 0.55;
+}
+@keyframes next-on {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+.next__body {
+  display: grid;
+  gap: 1px;
+}
+.next__body strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.next__body span {
+  font-size: 13px;
+  color: var(--on-scene-muted);
+}
+.next__state {
+  font-size: 11.5px;
+  color: var(--on-scene-muted);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.next__foot {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--on-scene-line);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #d8b98a;
+}
+.done2__actions {
+  display: grid;
+  gap: 10px;
+  animation-delay: 1.1s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal__ring,
+  .seal__check {
+    stroke-dashoffset: 0;
+  }
+  .seal::after {
+    display: none;
+  }
+}
+
+/* Résumé du pied sur une ligne, même sur iPhone SE. */
+.flow__sum span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

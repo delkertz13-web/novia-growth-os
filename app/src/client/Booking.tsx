@@ -1,17 +1,19 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { business } from '../config/business.demo'
 import { galleryById } from '../config/content.demo'
-import type { GalleryItem } from '../config/schema'
-import { resolveMedia } from '../media/media'
+import type { GalleryItem, ServiceConfig } from '../config/schema'
 import { serviceById } from '../config/services.demo'
 import type { Appointment } from '../core/types'
+import { resolveMedia } from '../media/media'
 import { providers } from '../providers/mock'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Notice, Photo, useDemoState } from '../ui/common'
+import { prefersReducedMotion } from '../ui/motion'
+import './booking/booking.css'
+import { Confirmation } from './booking/Confirmation'
+import { dayState, dayStateLabel, depositLabel, inspoSize, sameDay, slotEnd, steps, type Step } from './booking/model'
 
-type Step = 'service' | 'when' | 'contact' | 'recap'
-const steps: Step[] = ['service', 'when', 'contact', 'recap']
 const stepTitles: Record<Step, string> = {
   service: 'Prestation',
   when: 'Date et créneau',
@@ -20,6 +22,7 @@ const stepTitles: Record<Step, string> = {
 }
 
 const period = (d: Date) => (d.getHours() < 12 ? 'Matin' : d.getHours() < 17 ? 'Après-midi' : 'Soir')
+const hours = business.openingHours.value
 
 export function Booking() {
   const [params] = useSearchParams()
@@ -31,10 +34,12 @@ export function Booking() {
   const inspo = inspiration ? galleryById(inspiration) : undefined
   const [serviceId, setServiceId] = useState<string | null>(preset && serviceById(preset) ? preset : null)
   const [step, setStep] = useState<Step>(serviceId ? 'when' : 'service')
+  const [dir, setDir] = useState<'fwd' | 'back'>('fwd')
   const [day, setDay] = useState<Date | null>(null)
   const [slot, setSlot] = useState<Date | null>(null)
   const [contact, setContact] = useState({ firstName: '', lastName: '', phone: '', email: '' })
   const [touched, setTouched] = useState(false)
+  const [sending, setSending] = useState(false)
   const [done, setDone] = useState<Appointment | null>(null)
 
   const service = serviceId ? serviceById(serviceId) : undefined
@@ -50,9 +55,10 @@ export function Booking() {
       out.push({ date: d, count: serviceId ? providers.booking.getSlots(d, serviceId).length : 0 })
     }
     return out
+    // `step` : recalcul en revenant sur l'étape (l'agenda a pu changer)
   }, [serviceId, step])
 
-  const selectedDay = day ?? days.find((d) => d.count > 0)?.date ?? null
+  const selectedDay = day ?? (slot ? new Date(new Date(slot).setHours(0, 0, 0, 0)) : null) ?? days.find((d) => d.count > 0)?.date ?? null
   const slots = selectedDay && serviceId ? providers.booking.getSlots(selectedDay, serviceId) : []
   const grouped = slots.reduce<Record<string, Date[]>>((acc, s) => {
     ;(acc[period(s)] ??= []).push(s)
@@ -70,9 +76,30 @@ export function Booking() {
   const idx = steps.indexOf(step)
   const canNext = (step === 'service' && !!service) || (step === 'when' && !!slot) || (step === 'contact' && contactValid) || step === 'recap'
 
+  const goTo = (s: Step) => {
+    setDir(steps.indexOf(s) < idx ? 'back' : 'fwd')
+    setStep(s)
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+  }
+
   const back = () => {
     if (idx === 0 || (idx === 1 && preset)) navigate(-1)
-    else setStep(steps[idx - 1])
+    else goTo(steps[idx - 1])
+  }
+
+  const confirm = () => {
+    if (!service || !slot || sending) return
+    const create = () => {
+      const a = providers.booking.createBooking({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
+      setDone(a)
+      window.scrollTo({ top: 0 })
+    }
+    // Un court temps d'envoi rend la confirmation lisible ; aucun appel réseau.
+    if (prefersReducedMotion()) create()
+    else {
+      setSending(true)
+      window.setTimeout(create, 450)
+    }
   }
 
   const next = () => {
@@ -80,23 +107,19 @@ export function Booking() {
       setTouched(true)
       return
     }
-    if (step === 'recap' && service && slot) {
-      const a = providers.booking.createBooking({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
-      setDone(a)
-      window.scrollTo({ top: 0 })
-      return
-    }
-    setStep(steps[idx + 1])
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (step === 'recap') return confirm()
+    goTo(steps[idx + 1])
   }
 
-  if (done && service) return <Confirmation appointment={done} />
+  if (done) return <Confirmation appointment={done} inspo={inspo} />
+
+  const subject = step !== 'service' && service ? <Chosen step={step} inspo={inspo} service={service} /> : null
 
   return (
     <main className="flow">
       <div className="flow__top">
         <div className="wrap flow__bar">
-          <button className="icon-btn" onClick={back} aria-label="Étape précédente">
+          <button type="button" className="icon-btn" onClick={back} aria-label="Étape précédente">
             <Icon name="arrowLeft" size={18} />
           </button>
           <div style={{ flex: 1 }}>
@@ -114,21 +137,27 @@ export function Booking() {
         </div>
       </div>
 
-      <div className="wrap flow__body page" key={step}>
-        {inspo && step !== 'service' && <Inspiration item={inspo} />}
+      {subject && <div className="wrap flow__subject">{subject}</div>}
+
+      <div className="wrap flow__body flow__step" data-dir={dir} key={step}>
         {step === 'service' && (
           <>
-            <h1 className="display flow__title">Quelle séance ?</h1>
-            <p className="flow__lead">Prix et durées de démonstration.</p>
+            <h1 className="display flow__title">Quelle séance ?</h1>
+            <p className="flow__lead">
+              {inspo ? `Pour votre inspiration « ${inspo.title} ». ` : ''}Prix et durées de démonstration.
+            </p>
             <div className="choice-list">
               {services.map((s) => (
                 <button
                   key={s.id}
+                  type="button"
                   className={`choice ${serviceId === s.id ? 'is-selected' : ''}`}
                   onClick={() => {
-                    setServiceId(s.id)
-                    setDay(null)
-                    setSlot(null)
+                    if (s.id !== serviceId) {
+                      setServiceId(s.id)
+                      setDay(null)
+                      setSlot(null)
+                    }
                   }}
                   aria-pressed={serviceId === s.id}
                 >
@@ -148,52 +177,37 @@ export function Booking() {
 
         {step === 'when' && service && (
           <>
-            <h1 className="display flow__title">Quand ?</h1>
-            <p className="flow__lead">
-              {service.name} · {fmt.duration(service.durationMin)}
-            </p>
-            <div className="days" role="listbox" aria-label="Jour">
-              {days.map(({ date, count }) => {
-                const selected = selectedDay && date.getTime() === selectedDay.getTime()
-                return (
-                  <button
-                    key={date.toISOString()}
-                    className={`day ${selected ? 'is-selected' : ''}`}
-                    disabled={count === 0}
-                    onClick={() => {
-                      setDay(date)
-                      setSlot(null)
-                    }}
-                    aria-selected={!!selected}
-                  >
-                    <small>{date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}</small>
-                    <b>{date.getDate()}</b>
-                    <i>{count === 0 ? '—' : `${count} dispo`}</i>
-                  </button>
-                )
-              })}
-            </div>
-            {selectedDay && (
-              <p style={{ fontWeight: 600, margin: '0 0 14px' }}>{capitalize(fmt.dayLong(selectedDay))}</p>
-            )}
-            {Object.entries(grouped).map(([label, list]) => (
-              <div className="slot-group" key={label}>
-                <h3>{label}</h3>
-                <div className="slots">
-                  {list.map((s) => (
-                    <button
-                      key={s.toISOString()}
-                      className={`slot ${slot?.getTime() === s.getTime() ? 'is-selected' : ''}`}
-                      onClick={() => setSlot(s)}
-                      aria-pressed={slot?.getTime() === s.getTime()}
-                    >
-                      {fmt.time(s)}
-                    </button>
-                  ))}
+            <h1 className="display flow__title">Quand ?</h1>
+            <p className="flow__lead">Touchez un jour, puis un horaire.</p>
+            <DayStrip
+              days={days}
+              selected={selectedDay}
+              onPick={(d) => {
+                setDay(d)
+                if (slot && !sameDay(slot, d)) setSlot(null)
+              }}
+            />
+            {selectedDay && <p className="when__day">{capitalize(fmt.dayLong(selectedDay))}</p>}
+            <div className="when__slots" key={selectedDay?.toDateString()}>
+              {Object.entries(grouped).map(([label, list]) => (
+                <div className="slot-group" key={label}>
+                  <h3>
+                    {label} <small>{list.length}</small>
+                  </h3>
+                  <div className="slots">
+                    {list.map((s) => {
+                      const on = slot?.getTime() === s.getTime()
+                      return (
+                        <button key={s.toISOString()} type="button" className={`slot ${on ? 'is-selected' : ''}`} onClick={() => setSlot(s)} aria-pressed={on}>
+                          {fmt.time(s)}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {slots.length === 0 && <div className="empty">Aucun créneau ce jour-là.</div>}
+              ))}
+              {slots.length === 0 && <div className="empty">Aucun créneau ce jour-là.</div>}
+            </div>
           </>
         )}
 
@@ -201,7 +215,15 @@ export function Booking() {
           <>
             <h1 className="display flow__title">Vos coordonnées</h1>
             <p className="flow__lead">Pour vous confirmer le rendez-vous. Rien n’est transmis dans cette démonstration.</p>
-            <div className="form-grid">
+            <form
+              id="contact-form"
+              className="form-grid"
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault()
+                next()
+              }}
+            >
               {(
                 [
                   ['firstName', 'Prénom', 'given-name', 'text'],
@@ -209,64 +231,100 @@ export function Booking() {
                   ['phone', 'Téléphone', 'tel', 'tel'],
                   ['email', 'Email', 'email', 'email'],
                 ] as const
-              ).map(([key, label, ac, type]) => (
+              ).map(([key, label, ac, type], i, all) => (
                 <div className="field" key={key}>
                   <label htmlFor={key}>{label}</label>
                   <input
                     id={key}
                     type={type}
                     autoComplete={ac}
+                    enterKeyHint={i === all.length - 1 ? 'done' : 'next'}
                     inputMode={type === 'tel' ? 'tel' : type === 'email' ? 'email' : undefined}
                     value={contact[key]}
                     onChange={(e) => setContact({ ...contact, [key]: e.target.value })}
                     aria-invalid={touched && !!errors[key]}
+                    aria-describedby={touched && errors[key] ? `${key}-err` : undefined}
                   />
-                  {touched && errors[key] && <span className="field__error">{errors[key]}</span>}
+                  {touched && errors[key] && (
+                    <span className="field__error" id={`${key}-err`}>
+                      {errors[key]}
+                    </span>
+                  )}
                 </div>
               ))}
-            </div>
+            </form>
           </>
         )}
 
         {step === 'recap' && service && slot && (
           <>
             <h1 className="display flow__title">On récapitule</h1>
-            <p className="flow__lead">Vérifiez avant de confirmer.</p>
-            <div className="card recap">
-              <Row k="Prestation" v={service.name} />
-              <Row k="Date" v={capitalize(fmt.dayLong(slot))} />
-              <Row k="Heure" v={`${fmt.time(slot)} · ${fmt.duration(service.durationMin)}`} />
-              <Row k="Avec" v={`${business.artistFirstName.value} · ${business.name.value}`} />
-              <Row k="Au nom de" v={`${contact.firstName} ${contact.lastName}`} />
-              <div className="recap__row recap__total">
-                <span>Prix</span>
-                <span style={{ fontSize: 18 }}>{fmt.eur(service.price)}</span>
+            <p className="flow__lead">Tout est modifiable avant de confirmer.</p>
+            <div className="card recap recap--v2">
+              {inspo && (
+                <div className="recap__inspo">
+                  <div className="recap__inspo-media">
+                    <Photo item={inspo} eager sizes="56px" />
+                  </div>
+                  <div>
+                    <span className="recap__k">Inspiration</span>
+                    <strong>{inspo.title}</strong>
+                  </div>
+                </div>
+              )}
+              <RecapRow k="Prestation" v={service.name} edit={() => goTo('service')} />
+              <RecapRow k="Date" v={capitalize(fmt.dayLong(slot))} edit={() => goTo('when')} />
+              <RecapRow k="Heure" v={`${fmt.time(slot)} → ${fmt.time(slotEnd(slot, service.durationMin))}`} />
+              <RecapRow k="Durée" v={fmt.duration(service.durationMin)} />
+              <RecapRow k="Avec" v={`${business.artistFirstName.value} · ${business.name.value}, ${business.city.value}`} />
+              <RecapRow k="Au nom de" v={`${contact.firstName} ${contact.lastName}`} edit={() => goTo('contact')} />
+              <div className="recap__money">
+                <div className="recap__row recap__total">
+                  <span>Prix</span>
+                  <span>{fmt.eur(service.price)}</span>
+                </div>
+                <div className="recap__row">
+                  <span>Acompte</span>
+                  <span>{depositLabel(service, fmt.eur)}</span>
+                </div>
               </div>
-              {service.deposit > 0 && <Row k="Acompte (fictif)" v={fmt.eur(service.deposit)} />}
             </div>
-            <div style={{ height: 14 }} />
-            <Notice>
-              Démonstration : aucun paiement ni acompte n’est demandé, aucune réservation réelle n’est créée.
-            </Notice>
+            <ul className="trust">
+              <li>
+                <Icon name="check" size={14} stroke={2.4} /> Confirmation immédiate, puis rappels avant le rendez-vous
+              </li>
+              <li>
+                <Icon name="check" size={14} stroke={2.4} /> Aucun paiement en ligne
+              </li>
+            </ul>
+            <Notice>Démonstration : aucun paiement ni acompte n’est demandé, aucune réservation réelle n’est créée et aucun message n’est envoyé.</Notice>
           </>
         )}
       </div>
 
       <div className="flow__footer">
         <div className="wrap">
-          <div className="flow__sum">
+          <div className="flow__sum" aria-live="polite" key={slot?.getTime() ?? serviceId ?? 'none'}>
             {service ? (
               <>
                 <strong>{service.name}</strong>
-                <span>{slot ? `${capitalize(fmt.dayShort(slot))} · ${fmt.time(slot)}` : fmt.eur(service.price)}</span>
+                <span>{slot ? `${capitalize(fmt.dayShort(slot))} · ${fmt.time(slot)} · ${fmt.eur(service.price)}` : `${fmt.duration(service.durationMin)} · ${fmt.eur(service.price)}`}</span>
               </>
             ) : (
               <span>Choisissez une prestation</span>
             )}
           </div>
-          <button className={`btn ${step === 'recap' ? 'btn--lacquer' : 'btn--primary'}`} disabled={!canNext && step !== 'contact'} onClick={next}>
-            {step === 'recap' ? 'Confirmer' : 'Continuer'}
-            <Icon name={step === 'recap' ? 'check' : 'arrowRight'} size={18} />
+          <button
+            // Un bouton par étape : sinon le même nœud, devenu « submit » pendant le clic, soumettrait aussitôt les coordonnées.
+            key={step}
+            type={step === 'contact' ? 'submit' : 'button'}
+            form={step === 'contact' ? 'contact-form' : undefined}
+            className={`btn ${step === 'recap' ? 'btn--lacquer' : 'btn--primary'} ${sending ? 'is-sending' : ''}`}
+            disabled={(!canNext && step !== 'contact') || sending}
+            onClick={step === 'contact' ? undefined : next}
+          >
+            {sending ? 'Réservation…' : step === 'recap' ? 'Confirmer' : 'Continuer'}
+            {!sending && <Icon name={step === 'recap' ? 'check' : 'arrowRight'} size={18} />}
           </button>
         </div>
       </div>
@@ -274,62 +332,81 @@ export function Booking() {
   )
 }
 
-const Row = ({ k, v }: { k: string; v: string }) => (
+const RecapRow = ({ k, v, edit }: { k: string; v: string; edit?: () => void }) => (
   <div className="recap__row">
-    <span>{k}</span>
+    <span>
+      {k}
+      {edit && (
+        <button type="button" className="recap__edit" onClick={edit} aria-label={`Modifier : ${k}`}>
+          Modifier
+        </button>
+      )}
+    </span>
     <span>{v}</span>
   </div>
 )
 
-function Confirmation({ appointment: a }: { appointment: Appointment }) {
-  const s = serviceById(a.serviceId)!
-  const start = new Date(a.start)
+/** Bande de jours : fermé / complet / nombre de créneaux, jour choisi ramené à l'écran. */
+function DayStrip({ days, selected, onPick }: { days: { date: Date; count: number }[]; selected: Date | null; onPick: (d: Date) => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const strip = ref.current
+    const el = strip?.querySelector<HTMLElement>('.day.is-selected')
+    if (!strip || !el) return
+    const left = el.offsetLeft - strip.offsetLeft
+    if (left < strip.scrollLeft || left + el.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollTo({ left: Math.max(0, left - 20), behavior: 'auto' })
+    }
+    // seulement à l'arrivée sur l'étape
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
-    <main className="wrap done page">
-      <div className="done__mark">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 12.5l4.5 4.5L19 7.5" />
-        </svg>
-      </div>
-      <div className="eyebrow">Réservation simulée</div>
-      <h1 className="display">C’est noté.</h1>
-      <p className="muted" style={{ margin: 0 }}>
-        {capitalize(fmt.dayLong(start))} à {fmt.time(start)}.
-      </p>
-      <div className="card recap">
-        <Row k="Prestation" v={s.name} />
-        <Row k="Durée" v={fmt.duration(s.durationMin)} />
-        <Row k="Prix" v={fmt.eur(s.price)} />
-        <Row k="Référence" v={a.ref} />
-      </div>
-      <Notice>
-        Démonstration : la confirmation et les rappels (24 h et 2 h avant, paramètres démo) seraient envoyés automatiquement. Aucun
-        message n’est envoyé.
-      </Notice>
-      <div className="done__actions">
-        <Link to={`/pro/rdv/${a.id}`} className="btn btn--primary">
-          Voir ce rendez-vous côté pro
-        </Link>
-        <Link to="/" className="btn btn--ghost">
-          Retour à l’accueil
-        </Link>
-      </div>
-    </main>
+    <div className="days" ref={ref} role="listbox" aria-label="Jour">
+      {days.map(({ date, count }) => {
+        const state = dayState(date, hours, count)
+        const on = !!selected && sameDay(date, selected)
+        return (
+          <button
+            key={date.toISOString()}
+            type="button"
+            role="option"
+            className={`day day--${state.kind} ${on ? 'is-selected' : ''}`}
+            disabled={state.kind !== 'open'}
+            onClick={() => onPick(date)}
+            aria-selected={on}
+            aria-label={`${capitalize(fmt.dayLong(date))} : ${dayStateLabel(state)}`}
+          >
+            <small>{date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}</small>
+            <b>{date.getDate()}</b>
+            <i>{dayStateLabel(state)}</i>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
-/** Pose choisie dans la galerie : elle reste en tête de la réservation (transition continue depuis la visionneuse). */
-function Inspiration({ item }: { item: GalleryItem }) {
-  const fictional = resolveMedia(item.id)?.provenance === 'fictif'
+/**
+ * Ce que l'on réserve, gardé en tête du parcours : la pose choisie en galerie (même
+ * nom de transition que la visionneuse, donc continuité visuelle), sinon la prestation.
+ * Grande au choix de la date, plus discrète ensuite, jamais retirée brutalement.
+ */
+function Chosen({ step, inspo, service }: { step: Step; inspo?: GalleryItem; service: ServiceConfig }) {
+  const size = inspoSize(step)
+  const fictional = inspo ? resolveMedia(inspo.id)?.provenance === 'fictif' : false
   return (
-    <div className="inspo">
-      <div className="inspo__media" style={{ viewTransitionName: 'pose' } as CSSProperties}>
-        <Photo item={item} eager sizes="64px" />
+    <div className={`chosen chosen--${size} ${inspo ? 'chosen--inspo' : ''}`}>
+      <div className="chosen__media" style={inspo ? ({ viewTransitionName: 'pose' } as CSSProperties) : undefined}>
+        {inspo ? <Photo item={inspo} eager sizes="96px" /> : <Photo imageId={service.coverImageId} eager sizes="96px" />}
       </div>
-      <div className="inspo__text">
-        <span className="inspo__label">Votre inspiration</span>
-        <span className="inspo__title">{item.title}</span>
-        <span className="inspo__hint">{fictional ? 'Visuel fictif, à titre d’inspiration' : 'À titre d’inspiration'}</span>
+      <div className="chosen__text">
+        <span className="chosen__label">{inspo ? 'Je réserve cette inspiration' : 'Votre prestation'}</span>
+        <span className="chosen__title">{inspo ? inspo.title : service.name}</span>
+        <span className="chosen__sub">
+          {inspo ? `${service.name} · ` : ''}
+          {fmt.duration(service.durationMin)} · {fmt.eur(service.price)}
+        </span>
+        {fictional && <span className="chosen__prov">Visuel fictif, à titre d’inspiration</span>}
       </div>
     </div>
   )
