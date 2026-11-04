@@ -6,16 +6,16 @@ export function ClientHeader({ overlay = false }: { overlay?: boolean }) {
   return (
     <header className={`c-header ${overlay ? 'c-header--overlay' : ''}`}>
       <div className="wrap c-header__row">
-        <NavLink to="/" className="brand" aria-label={`${business.name.value} — accueil`}>
+        <NavLink to="/" viewTransition className="brand" aria-label={`${business.name.value} — accueil`}>
           {business.name.value}
         </NavLink>
         <nav className="c-nav" aria-label="Navigation principale">
-          <NavLink to="/galerie" className="c-nav__keep">
+          <NavLink to="/galerie" viewTransition className="c-nav__keep">
             Réalisations
           </NavLink>
-          <NavLink to="/prestations">Prestations</NavLink>
-          <NavLink to="/infos">Infos</NavLink>
-          <NavLink to="/reserver" className="btn btn--sm btn--primary c-nav__cta" style={{ color: 'var(--porcelain)' }}>
+          <NavLink to="/prestations" viewTransition>Prestations</NavLink>
+          <NavLink to="/infos" viewTransition>Infos</NavLink>
+          <NavLink to="/reserver" viewTransition className="btn btn--sm btn--primary c-nav__cta" style={{ color: 'var(--porcelain)' }}>
             Réserver
           </NavLink>
         </nav>

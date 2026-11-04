@@ -61,7 +61,10 @@ export interface GalleryItem {
   category: GalleryCategory
   shape: NailShape
   length: NailLength
-  /** chemin sous /public, ex. /demo-media/gallery/french-amande-moyenne.jpg ; absent = placeholder */
+  /**
+   * Chemin explicite sous /public, servi tel quel (contourne le pipeline médias).
+   * Normalement absent : le visuel vient de media-source/gallery/<id>.* via `npm run media`.
+   */
   src?: string
   alt: string
   credit?: string

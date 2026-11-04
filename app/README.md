@@ -13,6 +13,7 @@ npm run dev        # http://localhost:5173 (accessible en Wi-Fi depuis un télé
 npm test           # tests des règles métier
 npm run build      # contrôle de types + build de production dans dist/
 npm run preview    # sert le build
+npm run media      # prépare les visuels déposés dans media-source/ (AVIF/WebP, 3 tailles, aperçu flou)
 ```
 
 Espace cliente : `/`. Cockpit professionnel : `/pro`. Le bandeau « DÉMO » permet de passer de l'un à l'autre et de **réinitialiser la démo** (icône ↻).
@@ -24,7 +25,7 @@ Espace cliente : `/`. Cockpit professionnel : `/pro`. Le bandeau « DÉMO » per
 | Nom, slogan, prénom, ville, adresse, téléphone, horaires, liens | `src/config/business.demo.ts` |
 | Prestations, durées, prix, acomptes, délai de remplissage | `src/config/services.demo.ts` |
 | Galerie, FAQ, politique d'annulation, avis fictifs | `src/config/content.demo.ts` |
-| Visuels réalistes | déposer les fichiers dans `public/demo-media/gallery/` (voir le README de ce dossier) |
+| Visuels (Hero, Hero détouré, 12 réalisations) | déposer les fichiers dans `media-source/`, puis `npm run media` (voir `media-source/README.md`) |
 | Paramètres W01–W04 (rappels, délais, plafonds, plage d'envoi) | `src/config/rules.demo.ts` |
 | Clientes, rendez-vous et scénario | `src/providers/mock/seed.ts` |
 
@@ -39,7 +40,9 @@ src/
 │                récupérations W03/W04, validation SMS, revenu, créneaux, SmartFill
 ├── providers/   6 interfaces (Booking, CRM, Messaging, Voice, Payment, Analytics)
 │   └── mock/    6 implémentations Mock + store localStorage + jeu de données
-├── ui/          composants partagés (bandeau démo, photo/placeholder, feuille, pastilles)
+├── media/       manifeste des visuels généré par `npm run media` + aides (srcset, point focal, provenance)
+├── ui/          composants partagés (bandeau démo, Photo, feuille, pastilles)
+│   └── motion/  socle de mouvement V2 : mouvement réduit, transitions de vue, progression au scroll, compteurs
 ├── client/      espace cliente
 └── pro/         cockpit /pro
 ```
