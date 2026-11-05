@@ -19,7 +19,7 @@ const emptyReport = () => {
   const z = () => ({ potential: 0, booked: 0, confirmed: 0 })
   return {
     totals: z(),
-    bySource: { acquisition: z(), cancellation_recovery: z(), noshow_recovery: z(), reactivation: z(), referral: z(), smartfill: z(), direct: z() },
+    bySource: { acquisition: z(), cancellation_recovery: z(), noshow_recovery: z(), reactivation: z(), referral: z(), smartfill: z(), voice: z(), direct: z() },
     awaitingProof: 0,
   }
 }
@@ -131,13 +131,15 @@ describe('parcours complet avec les providers Mock', () => {
     expect(after.revenue.toRecover - before.revenue.toRecover).toBe(45)
   })
 
-  it('reprendre la conversation arrête la séquence ; NOVIA peut ensuite regérer', () => {
+  it('reprendre la conversation met la séquence en pause ; rendre à NOVIA la relance', () => {
     const novia = createNovia(mockProviders, { rules, services })
     const run = novia.snapshot().runs.find((r) => r.state === 'active')!
     novia.pro.takeOverConversation(run.customerId)
-    expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('stopped')
+    // Lot 6 : la reprise humaine suspend (pause) au lieu d'arrêter, sans aucun envoi
+    expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('paused')
     expect(novia.pro.customerFile(run.customerId, novia.now())!.contactable).toBe(false)
     novia.pro.letNoviaHandle(run.customerId)
     expect(novia.snapshot().customers.find((c) => c.id === run.customerId)!.humanTakeover).toBe(false)
+    expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('active')
   })
 })

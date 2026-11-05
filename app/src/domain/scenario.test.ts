@@ -127,7 +127,7 @@ describe('le scénario de référence contient toute la démonstration', () => {
       todayBooked: 295, // 70 + 45 + 35 + 45 + 15 + 85 (pose gel, remplissage, semi-permanent, remplissage, nail art, dépose + pose)
       todayConfirmed: 35,
       toRecover: 80,
-      noviaWonThisMonth: 90,
+      noviaWonThisMonth: 245, // 90 (SmartFill + récupérations) + 85 et 70 (deux RDV pris par NOVIA Voice, Lot 6)
       noviaConfirmedThisMonth: 0,
     })
   })

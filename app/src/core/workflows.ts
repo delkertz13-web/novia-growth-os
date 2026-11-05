@@ -233,12 +233,26 @@ export function advanceRecovery(run: WorkflowRun, ctx: Omit<GuardContext, 'workf
 }
 
 /** La cliente refuse : STOP immédiat. */
+const open = (run: WorkflowRun) => run.state === 'active' || run.state === 'paused'
+
 export const declineRecovery = (run: WorkflowRun, now: Date) =>
-  run.state === 'active' ? stopRun(run, now, 'Refus de la cliente : STOP.', 'declined') : run
+  open(run) ? stopRun(run, now, 'Refus de la cliente : STOP.', 'declined') : run
 
 /** La cliente réserve : STOP et retour W02. */
 export const markRecovered = (run: WorkflowRun, now: Date) =>
-  run.state === 'active' ? stopRun(run, now, 'Nouveau rendez-vous réservé : STOP → W02.', 'recovered') : run
+  open(run) ? stopRun(run, now, 'Nouveau rendez-vous réservé : STOP → W02.', 'recovered') : run
+
+/** Reprise humaine : la séquence se met en pause (aucun envoi), sans perdre son étape. */
+export const pauseRun = (run: WorkflowRun, now: Date): WorkflowRun =>
+  run.state === 'active'
+    ? { ...run, state: 'paused', actions: [...run.actions, act(now, 'blocked', 'En pause : la professionnelle a repris la conversation.')] }
+    : run
+
+/** La professionnelle rend la main : la séquence reprend, et revérifie tout avant le prochain envoi. */
+export const resumeRun = (run: WorkflowRun, now: Date): WorkflowRun =>
+  run.state === 'paused'
+    ? { ...run, state: 'active', actions: [...run.actions, act(now, 'info', 'Rendue à NOVIA : reprise, avec revérification avant tout envoi.')] }
+    : run
 
 /**
  * Correction de statut : l'état actuel écrase l'ancien,
@@ -246,7 +260,7 @@ export const markRecovered = (run: WorkflowRun, now: Date) =>
  */
 export function stopObsoleteRuns(runs: WorkflowRun[], appointment: Appointment, now: Date): WorkflowRun[] {
   return runs.map((r) => {
-    if (r.state !== 'active' || r.appointmentId !== appointment.id) return r
+    if (!open(r) || r.appointmentId !== appointment.id) return r
     const stillValid =
       (r.workflow === 'W04' && appointment.status === 'no_show') ||
       (r.workflow === 'W03' && appointment.status === 'cancelled')

@@ -27,6 +27,7 @@ export type AttributionSource =
   | 'reactivation'
   | 'referral'
   | 'smartfill'
+  | 'voice' // RDV pris par NOVIA Voice
   | 'direct' // cliente existante, réservation sans action NOVIA attribuable
 
 export interface StatusEvent {
@@ -60,6 +61,8 @@ export interface Appointment {
   rescheduledToId?: string
   history: StatusEvent[]
   paymentProof?: PaymentProof
+  /** moment de la prise de RDV (absent sur les données antérieures) */
+  bookedAt?: string
 }
 
 export interface Customer {
@@ -99,7 +102,8 @@ export interface WorkflowRun {
   workflow: WorkflowId
   customerId: string
   appointmentId?: string
-  state: 'active' | 'stopped' | 'completed'
+  /** paused : la professionnelle a repris la conversation ; reprend quand elle rend la main à NOVIA */
+  state: 'active' | 'paused' | 'stopped' | 'completed'
   step: RunStep
   messagesSent: number
   startedAt: string
@@ -132,4 +136,76 @@ export interface WaitlistEntry {
   periods: ('matin' | 'apres-midi' | 'soir')[]
   flexible: boolean
   createdAt: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversations (collaboration NOVIA ↔ professionnelle)                */
+/* ------------------------------------------------------------------ */
+
+export type ConversationChannel = 'sms' | 'instagram' | 'site'
+
+export interface ConversationMessage {
+  id: string
+  at: string
+  from: 'client' | 'novia' | 'pro'
+  body: string
+  /** réponse NOVIA tirée d'une FAQ approuvée */
+  faqId?: string
+}
+
+/**
+ * L'état affiché (NOVIA gère / réponse nécessaire / reprise humaine) n'est PAS stocké :
+ * il se déduit de `needsHuman` et du drapeau `humanTakeover` de la cliente (domaine).
+ */
+export interface Conversation {
+  id: string
+  customerId: string
+  channel: ConversationChannel
+  needsHuman: boolean
+  /** pourquoi NOVIA passe la main (question inconnue, sujet sensible) */
+  needsHumanReason?: string
+  unread: boolean
+  messages: ConversationMessage[]
+}
+
+/* ------------------------------------------------------------------ */
+/* NOVIA Voice (simulé)                                                 */
+/* ------------------------------------------------------------------ */
+
+export type VoiceCallOutcome = 'booked' | 'answered' | 'transferred' | 'voicemail'
+
+export interface VoiceCall {
+  id: string
+  at: string
+  callerName: string
+  phone: string
+  customerId?: string
+  durationSec: number
+  /** pourquoi NOVIA a décroché */
+  trigger: 'missed' | 'after_hours' | 'all'
+  /** qui a décroché : NOVIA, ou Léa elle-même (journal du standard) */
+  handledBy: 'novia' | 'pro'
+  outcome: VoiceCallOutcome
+  summary: string
+  transcript: { from: 'caller' | 'novia'; text: string }[]
+  appointmentId?: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Réglages NOVIA (appartiennent au domaine NOVIA, pas au backend)      */
+/* ------------------------------------------------------------------ */
+
+export interface NoviaSettings {
+  automations: {
+    cancellationRecovery: boolean
+    noShowRecovery: boolean
+    smartFill: boolean
+    rebooking: boolean
+    /** W05 / W06 : à concevoir, non activables */
+    reviews: boolean
+    referral: boolean
+  }
+  /** plage d'envoi des messages automatiques */
+  sendWindow: { start: string; end: string }
+  channels: { sms: boolean; email: boolean; instagram: boolean }
 }

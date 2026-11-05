@@ -10,6 +10,8 @@ import { isSlotFree } from '../core/availability'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowAction, WorkflowId, WorkflowRun } from '../core/types'
 import type { NoviaSnapshot } from '../providers/types'
+import { buildInbox, type InboxItem } from './conversations'
+import { buildCustomerRows, type Segment } from './customers'
 
 export const sameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -86,7 +88,8 @@ export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'custo
 /* Cockpit                                                              */
 /* ------------------------------------------------------------------ */
 
-const noviaSources: AttributionSource[] = ['smartfill', 'cancellation_recovery', 'noshow_recovery']
+/** RDV obtenus par NOVIA : SmartFill, récupérations, et (Lot 6) appels pris par NOVIA Voice. */
+export const noviaSources: AttributionSource[] = ['smartfill', 'cancellation_recovery', 'noshow_recovery', 'voice']
 
 /**
  * Trois niveaux, jamais mélangés : potentiel (pas encore regagné), réservé (rendez-vous
@@ -99,7 +102,7 @@ export interface CockpitRevenue {
   todayConfirmed: number
   /** Potentiel : RDV perdus (absence, annulation) pas encore regagnés, toutes dates. */
   toRecover: number
-  /** Ce mois (date du RDV) : RDV obtenus par NOVIA (SmartFill, récupérations), réservé + confirmé. */
+  /** Ce mois (date du RDV) : RDV obtenus par NOVIA (SmartFill, récupérations, Voice), réservé + confirmé. */
   noviaWonThisMonth: number
   /** dont la part confirmée (prestation attestée + preuve). */
   noviaConfirmedThisMonth: number
@@ -114,6 +117,8 @@ export interface CockpitView {
   /** Indicateurs du panneau du jour. Définitions détaillées : src/domain/KPI.md */
   revenue: CockpitRevenue
   takenOver: Customer[]
+  /** conversations où NOVIA attend une réponse de la professionnelle */
+  needsReply: InboxItem[]
   feed: FeedItem[]
 }
 
@@ -135,11 +140,13 @@ export function buildCockpit(snap: NoviaSnapshot, now: Date, revenue: { all: Rev
       )
       .sort((a, b) => a.slotStart!.localeCompare(b.slotStart!)),
     recoveries: {
-      active: snap.runs.filter((r) => r.state === 'active').sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+      // une séquence en pause (reprise humaine) reste visible : elle n'est pas terminée
+      active: snap.runs.filter((r) => r.state === 'active' || r.state === 'paused').sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
       recoveredThisMonth: snap.runs.filter((r) => r.outcome === 'recovered' && r.endedAt && new Date(r.endedAt).getTime() >= monthStart).length,
     },
     revenue: cockpitRevenue(today, revenue),
     takenOver: snap.customers.filter((c) => c.humanTakeover),
+    needsReply: buildInbox(snap).filter((i) => i.state === 'needs_human'),
     feed: buildFeed(snap),
   }
 }
@@ -173,6 +180,14 @@ export interface CustomerFile {
   contactable: boolean
   /** remplissage conseillé, si la date approche */
   refill?: { daysSince: number; recommended: number }
+  /** montants des RDV de la cliente, par niveau (jamais additionnés) */
+  amounts: { booked: number; confirmed: number }
+  cancellations: number
+  segments: Segment[]
+  conversation?: InboxItem
+  calls: NoviaSnapshot['calls']
+  /** dernière prestation attestée */
+  lastService?: Appointment
 }
 
 export function buildCustomerFile(snap: NoviaSnapshot, customerId: string, now: Date, services: ServiceConfig[]): CustomerFile | null {
@@ -189,5 +204,14 @@ export function buildCustomerFile(snap: NoviaSnapshot, customerId: string, now: 
     lifetimeValue: appointments.filter((a) => a.status === 'showed').reduce((s, a) => s + a.price, 0),
     contactable: !customer.optOut && customer.consent.marketing && !customer.humanTakeover,
     refill: refill ? { daysSince: refill.daysSince, recommended: refill.recommended } : undefined,
+    amounts: {
+      booked: appointments.filter((a) => appointmentLevel(a) === 'booked').reduce((s, a) => s + a.price, 0),
+      confirmed: appointments.filter((a) => appointmentLevel(a) === 'confirmed').reduce((s, a) => s + a.paymentProof!.amount, 0),
+    },
+    cancellations: appointments.filter((a) => a.status === 'cancelled').length,
+    segments: buildCustomerRows(snap, now, services).find((r) => r.customer.id === customerId)?.segments ?? [],
+    conversation: buildInbox(snap).find((i) => i.conversation.customerId === customerId),
+    calls: snap.calls.filter((c) => c.customerId === customerId).sort((a, b) => b.at.localeCompare(a.at)),
+    lastService: appointments.find((a) => a.status === 'showed'),
   }
 }

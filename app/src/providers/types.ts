@@ -14,6 +14,10 @@ import type { RevenueReport } from '../core/revenue'
 import type {
   Appointment,
   BookingOrigin,
+  Conversation,
+  ConversationMessage,
+  NoviaSettings,
+  VoiceCall,
   Opportunity,
   WaitlistEntry,
   WorkflowRun,
@@ -52,6 +56,8 @@ export interface SimulatedMessage {
   id: string
   at: string
   to: string
+  customerId?: string
+  appointmentId?: string
   channel: 'sms'
   purpose: string
   body: string
@@ -61,6 +67,13 @@ export interface MessagingProvider {
   /** Ne transmet RIEN : consigne le message qui aurait été envoyé. */
   simulateSend(msg: Omit<SimulatedMessage, 'id' | 'at'>): SimulatedMessage
   listSimulated(): SimulatedMessage[]
+  /** Conversations avec les clientes (SMS, Instagram, site). */
+  listConversations(): Conversation[]
+  /** Retrouve ou ouvre la conversation d'une cliente. */
+  openConversation(customerId: string, channel: Conversation['channel']): Conversation
+  /** Consigne un message (aucun envoi réel en démo). */
+  appendMessage(conversationId: string, msg: Omit<ConversationMessage, 'id' | 'at'>): ConversationMessage
+  updateConversation(conversationId: string, patch: Partial<Pick<Conversation, 'needsHuman' | 'needsHumanReason' | 'unread'>>): void
 }
 
 export type VoiceMode = 'all' | 'missed' | 'after_hours'
@@ -72,6 +85,18 @@ export interface VoiceSettings {
 export interface VoiceProvider {
   getSettings(): VoiceSettings
   setSettings(s: Partial<VoiceSettings>): void
+  listCalls(): VoiceCall[]
+  /** Consigne un appel traité (en démo : appel simulé). */
+  logCall(call: Omit<VoiceCall, 'id'>): VoiceCall
+}
+
+/**
+ * Réglages de NOVIA. Ils appartiennent au domaine NOVIA (stockés par NOVIA, pas par
+ * un backend tiers) : un futur GHL les reçoit, il ne les définit pas.
+ */
+export interface SettingsProvider {
+  get(): NoviaSettings
+  update(patch: Partial<NoviaSettings>): NoviaSettings
 }
 
 export interface PaymentProvider {
@@ -112,6 +137,9 @@ export interface NoviaSnapshot {
   waitlist: WaitlistEntry[]
   messages: SimulatedMessage[]
   voice: VoiceSettings
+  conversations: Conversation[]
+  calls: VoiceCall[]
+  settings: NoviaSettings
 }
 
 export interface SyncProvider {
@@ -161,6 +189,7 @@ export interface Providers {
   automation: AutomationProvider
   demo?: DemoControls
   booking: BookingProvider
+  settings: SettingsProvider
   crm: CRMProvider
   messaging: MessagingProvider
   voice: VoiceProvider

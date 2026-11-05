@@ -15,6 +15,7 @@ export const sourceLabels: Record<AttributionSource, string> = {
   reactivation: 'Réactivation',
   referral: 'Parrainage',
   smartfill: 'SmartFill',
+  voice: 'NOVIA Voice',
   direct: 'Sans action NOVIA',
 }
 

@@ -10,13 +10,15 @@ import { applyValidation, isActiveBooking } from '../../core/appointmentStatus'
 import { availableSlots, findDuplicate, isSlotFree } from '../../core/availability'
 import { computeRevenue } from '../../core/revenue'
 import { smartFillFunnel } from '../../core/smartfill'
-import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowRun } from '../../core/types'
+import type { Appointment, AttributionSource, Conversation, ConversationMessage, Customer, Opportunity, VoiceCall, WorkflowRun } from '../../core/types'
 import {
   advanceRecovery,
   declineRecovery,
   evaluateGuards,
   markRecovered,
+  pauseRun,
   reminderTimes,
+  resumeRun,
   startRecovery,
   stopObsoleteRuns,
 } from '../../core/workflows'
@@ -30,6 +32,7 @@ import type {
   MessagingProvider,
   PaymentProvider,
   Providers,
+  SettingsProvider,
   SimulatedMessage,
   SyncProvider,
   VoiceProvider,
@@ -42,6 +45,9 @@ const upsert = <T extends { id: string }>(list: T[], item: T) =>
 const fullName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : 'Cliente')
 const fmtDateTime = (d: Date) =>
   d.toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+/** Règles appliquées : celles de la démo, ajustées par les réglages de la professionnelle. */
+const liveRules = () => ({ ...rules, sendWindow: getState().settings.sendWindow })
+const automations = () => getState().settings.automations
 
 /* ------------------------------------------------------------------ */
 /* Messaging (simulé)                                                   */
@@ -54,6 +60,26 @@ export const MockMessagingProvider: MessagingProvider = {
     return m
   },
   listSimulated: () => getState().messages,
+  listConversations: () => getState().conversations,
+  openConversation(customerId, channel) {
+    const existing = getState().conversations.find((c) => c.customerId === customerId)
+    if (existing) return existing
+    const conv: Conversation = { id: `conv-${customerId}`, customerId, channel, needsHuman: false, unread: false, messages: [] }
+    setState((s) => ({ ...s, conversations: [conv, ...s.conversations] }))
+    return conv
+  },
+  appendMessage(conversationId, msg) {
+    if (!getState().conversations.some((c) => c.id === conversationId)) throw new Error('Conversation introuvable')
+    const m: ConversationMessage = { ...msg, id: nextId('cm'), at: now().toISOString() }
+    setState((s) => ({
+      ...s,
+      conversations: s.conversations.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, m], unread: msg.from === 'client' ? true : c.unread } : c)),
+    }))
+    return m
+  },
+  updateConversation(conversationId, patch) {
+    setState((s) => ({ ...s, conversations: s.conversations.map((c) => (c.id === conversationId ? { ...c, ...patch } : c)) }))
+  },
 }
 
 /* ------------------------------------------------------------------ */
@@ -87,18 +113,13 @@ export const MockCRMProvider: CRMProvider = {
   },
   setHumanTakeover(customerId, value) {
     const t = now()
-    setState((s) => {
-      const customers = s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c))
-      if (!value) return { ...s, customers }
-      // reprise humaine : les séquences en cours s'arrêtent au contrôle suivant, ici immédiatement
-      const customer = customers.find((c) => c.id === customerId)!
-      const runs = s.runs.map((r) =>
-        r.customerId === customerId && r.state === 'active'
-          ? advanceRecovery(r, { customer, appointments: s.appointments, runs: s.runs, now: t, rules, sourceAppointment: s.appointments.find((a) => a.id === r.appointmentId) })
-          : r,
-      )
-      return { ...s, customers, runs }
-    })
+    setState((s) => ({
+      ...s,
+      customers: s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c)),
+      // reprise humaine : les séquences automatiques de cette cliente se mettent en pause ;
+      // rendre la main les relance, avec revérification complète avant tout envoi
+      runs: s.runs.map((r) => (r.customerId !== customerId ? r : value ? pauseRun(r, t) : resumeRun(r, t))),
+    }))
   },
 }
 
@@ -128,6 +149,7 @@ function insertAppointment(
     bookingOrigin: origin,
     attribution,
     history: [],
+    bookedAt: now().toISOString(),
   }
   setState((st) => ({
     ...st,
@@ -137,6 +159,8 @@ function insertAppointment(
   // W02 : confirmation immédiate + rappels configurés — SIMULÉS
   MockMessagingProvider.simulateSend({
     to: fullName(customer),
+    customerId: customer.id,
+    appointmentId: a.id,
     channel: 'sms',
     purpose: 'W02 · confirmation',
     body: `${business.name.value} — votre ${s.name} est réservé ${fmtDateTime(start)}.`,
@@ -148,7 +172,9 @@ function insertAppointment(
 function closeRecoveriesOnBooking(customerId: string, appointment: Appointment): AttributionSource | null {
   const t = now()
   const st = getState()
-  const active = st.runs.filter((r) => r.customerId === customerId && r.state === 'active' && (r.workflow === 'W03' || r.workflow === 'W04'))
+  const active = st.runs.filter(
+    (r) => r.customerId === customerId && (r.state === 'active' || r.state === 'paused') && (r.workflow === 'W03' || r.workflow === 'W04'),
+  )
   if (!active.length) return null
   const run = active[0]
   const attribution: AttributionSource = run.workflow === 'W04' ? 'noshow_recovery' : 'cancellation_recovery'
@@ -180,7 +206,8 @@ export const MockBookingProvider: BookingProvider = {
     if (!isSlotFree(input.start, service.durationMin, getState().appointments)) throw new Error('Ce créneau vient d’être réservé. Choisissez-en un autre.')
     const isNew = !findDuplicate(getState().customers, input.contact)
     const customer = MockCRMProvider.upsertContact(input.contact, input.source)
-    const attribution: AttributionSource = isNew ? (input.source === 'referral' ? 'referral' : 'acquisition') : 'direct'
+    const attribution: AttributionSource =
+      input.origin === 'voice' ? 'voice' : isNew ? (input.source === 'referral' ? 'referral' : 'acquisition') : 'direct'
     const a = insertAppointment(customer, input.serviceId, input.start, input.origin, attribution)
     const recovered = closeRecoveriesOnBooking(customer.id, a)
     return recovered ? { ...a, attribution: recovered } : a
@@ -219,26 +246,29 @@ export const MockBookingProvider: BookingProvider = {
     const newOpps: Opportunity[] = []
     let newRun: WorkflowRun | undefined
 
+    const auto = automations()
     if (outcome === 'absent') {
-      newRun = startRecovery('W04', res.updated, rules, t)
+      // le montant reste « à récupérer » ; la séquence ne démarre que si la récupération est activée
+      if (auto.noShowRecovery) newRun = startRecovery('W04', res.updated, liveRules(), t)
       newOpps.push({ id: nextId('o'), kind: 'noshow_recovery', amount: a.price, status: 'open', createdAt: t.toISOString(), sourceAppointmentId: a.id })
     }
     if (outcome === 'cancelled') {
-      newRun = startRecovery('W03', res.updated, rules, t)
+      newRun = auto.cancellationRecovery ? startRecovery('W03', res.updated, liveRules(), t) : undefined
       // W03 : vérification immédiate (nouveau RDV, opposition, reprise humaine…)
       const g = evaluateGuards({
         customer,
         appointments: getState().appointments,
         runs: getState().runs,
         now: t,
-        rules,
+        rules: liveRules(),
         workflow: 'W03',
         sourceAppointment: res.updated,
       })
-      if (g.kind === 'stop') newRun = advanceRecovery(newRun, { customer, appointments: getState().appointments, runs: [], now: t, rules, sourceAppointment: res.updated })
+      if (g.kind === 'stop' && newRun)
+        newRun = advanceRecovery(newRun, { customer, appointments: getState().appointments, runs: [], now: t, rules: liveRules(), sourceAppointment: res.updated })
       else newOpps.push({ id: nextId('o'), kind: 'cancellation_recovery', amount: a.price, status: 'open', createdAt: t.toISOString(), sourceAppointmentId: a.id })
       // le créneau libéré peut alimenter SmartFill
-      if (new Date(a.start).getTime() > t.getTime()) {
+      if (auto.smartFill && new Date(a.start).getTime() > t.getTime()) {
         newOpps.push({ id: nextId('o'), kind: 'smartfill', amount: a.price, status: 'open', createdAt: t.toISOString(), sourceAppointmentId: a.id, slotStart: a.start, slotDurationMin: a.durationMin })
       }
     }
@@ -246,6 +276,8 @@ export const MockBookingProvider: BookingProvider = {
       const times = reminderTimes(res.created, rules, t)
       MockMessagingProvider.simulateSend({
         to: fullName(customer),
+        customerId: customer.id,
+        appointmentId: res.created.id,
         channel: 'sms',
         purpose: 'W02 · déplacement',
         body: `Votre ${s.name} est déplacé au ${fmtDateTime(new Date(res.created.start))}. ${times.length} rappel(s) recalculé(s), anciens rappels annulés.`,
@@ -268,6 +300,27 @@ export const MockBookingProvider: BookingProvider = {
 export const MockVoiceProvider: VoiceProvider = {
   getSettings: () => getState().voice,
   setSettings: (v) => setState((s) => ({ ...s, voice: { ...s.voice, ...v } })),
+  listCalls: () => getState().calls,
+  logCall(call) {
+    const c: VoiceCall = { ...call, id: nextId('call') }
+    setState((s) => ({ ...s, calls: [c, ...s.calls] }))
+    return c
+  },
+}
+
+export const MockSettingsProvider: SettingsProvider = {
+  get: () => getState().settings,
+  update(patch) {
+    setState((s) => ({
+      ...s,
+      settings: {
+        automations: { ...s.settings.automations, ...patch.automations },
+        sendWindow: { ...s.settings.sendWindow, ...patch.sendWindow },
+        channels: { ...s.settings.channels, ...patch.channels },
+      },
+    }))
+    return getState().settings
+  },
 }
 
 export const MockPaymentProvider: PaymentProvider = {
@@ -304,10 +357,12 @@ export const engine = {
     if (!run) return
     const customer = st.customers.find((c) => c.id === run.customerId)!
     const source = st.appointments.find((a) => a.id === run.appointmentId)
-    const next = advanceRecovery(run, { customer, appointments: st.appointments, runs: st.runs, now: t, rules, sourceAppointment: source })
+    const next = advanceRecovery(run, { customer, appointments: st.appointments, runs: st.runs, now: t, rules: liveRules(), sourceAppointment: source })
     if (next.messagesSent > run.messagesSent) {
       MockMessagingProvider.simulateSend({
         to: fullName(customer),
+        customerId: customer.id,
+        appointmentId: run.appointmentId,
         channel: 'sms',
         purpose: `${run.workflow} · ${next.messagesSent === 1 ? 'récupération' : 'dernière relance'}`,
         body:
@@ -401,7 +456,10 @@ function firstAvailableSlot(serviceId: string): Date | undefined {
 
 export const MockAutomationProvider: AutomationProvider = {
   previewSmartFill: (id) => engine.smartFillFunnel(id),
-  launchSmartFill: (id) => engine.smartFillBook(id),
+  launchSmartFill(id) {
+    if (!automations().smartFill) throw new Error('SmartFill est désactivé dans les réglages.')
+    return engine.smartFillBook(id)
+  },
   closeSmartFill(id) {
     setState((s) => ({
       ...s,
@@ -423,6 +481,7 @@ export const providers: Providers = {
   automation: MockAutomationProvider,
   demo: MockDemoControls,
   booking: MockBookingProvider,
+  settings: MockSettingsProvider,
   crm: MockCRMProvider,
   messaging: MockMessagingProvider,
   voice: MockVoiceProvider,

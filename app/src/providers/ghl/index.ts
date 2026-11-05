@@ -37,7 +37,14 @@ export const GHLCRMProvider = notConnected<CRMProvider>('GHLCRMProvider', {
   setHumanTakeover: true,
 })
 
-export const GHLMessagingProvider = notConnected<MessagingProvider>('GHLMessagingProvider', { simulateSend: true, listSimulated: true })
+export const GHLMessagingProvider = notConnected<MessagingProvider>('GHLMessagingProvider', {
+  simulateSend: true,
+  listSimulated: true,
+  listConversations: true,
+  openConversation: true,
+  appendMessage: true,
+  updateConversation: true,
+})
 
 export const GHLAnalyticsProvider = notConnected<AnalyticsProvider>('GHLAnalyticsProvider', { getRevenue: true })
 

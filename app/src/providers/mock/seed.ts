@@ -12,9 +12,13 @@ import type {
   Customer,
   LeadSource,
   Opportunity,
+  Conversation,
+  NoviaSettings,
+  VoiceCall,
   WaitlistEntry,
   WorkflowRun,
 } from '../../core/types'
+import { defaultSettings } from '../../config/novia.demo'
 import type { SimulatedMessage } from '../types'
 
 export interface DemoState {
@@ -28,9 +32,12 @@ export interface DemoState {
   waitlist: WaitlistEntry[]
   messages: SimulatedMessage[]
   voice: { active: boolean; mode: 'all' | 'missed' | 'after_hours' }
+  conversations: Conversation[]
+  calls: VoiceCall[]
+  settings: NoviaSettings
 }
 
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 
 const H = 3_600_000
 const D = 24 * H
@@ -80,7 +87,7 @@ const people: C[] = [
   ['c01', 'Julie', 'Martin', 'site'],
   ['c02', 'Chloé', 'Petit', 'instagram'],
   ['c03', 'Inès', 'Benali', 'site'],
-  ['c04', 'Sarah', 'Moreau', 'referral'],
+  ['c04', 'Maëlle', 'Moreau', 'referral'],
   ['c05', 'Camille', 'Roux', 'instagram'],
   ['c06', 'Léna', 'Faure', 'site'],
   ['c07', 'Yasmine', 'Haddad', 'voice'],
@@ -99,6 +106,10 @@ const people: C[] = [
   ['c20', 'Mila', 'Fontaine', 'instagram', { humanTakeover: true }],
   ['c21', 'Lina', 'Rousseau', 'site'],
   ['c22', 'Eva', 'Morel', 'site'],
+  // nouveau lead Instagram : pas encore de rendez-vous
+  ['c23', 'Inaya', 'Diallo', 'instagram', { lifecycle: 'prospect' }],
+  // contact créé par NOVIA Voice aujourd'hui (appel de 14h18)
+  ['c24', 'Sarah', 'Benoît', 'voice'],
 ]
 
 /**
@@ -133,7 +144,7 @@ export function createSeed(now: Date): DemoState {
     serviceId: string,
     start: Date,
     status: AppointmentStatus,
-    o: { attribution?: AttributionSource; paid?: boolean; origin?: Appointment['bookingOrigin'] } = {},
+    o: { attribution?: AttributionSource; paid?: boolean; origin?: Appointment['bookingOrigin']; bookedAt?: Date } = {},
   ) => {
     const s = serviceById(serviceId)!
     const a: Appointment = {
@@ -150,6 +161,8 @@ export function createSeed(now: Date): DemoState {
       attribution: o.attribution ?? 'direct',
       history: [],
       paymentProof: o.paid ? { kind: 'demo_payment', amount: s.price, at: start.toISOString() } : undefined,
+      // pris une semaine avant (au plus tard la veille de la référence)
+      bookedAt: (o.bookedAt ?? new Date(Math.min(start.getTime() - 7 * D, n - D))).toISOString(),
     }
     refNo++
     appointments.push(a)
@@ -165,10 +178,10 @@ export function createSeed(now: Date): DemoState {
   add('c03', 'semi-permanent', atDay(now, 0, '14:30'), 'confirmed')
   add('c04', 'remplissage', atDay(now, 0, '16:00'), 'confirmed', { attribution: 'referral' })
   add('c05', 'nail-art', atDay(now, 0, '17:00'), 'booked')
-  add('c07', 'depose-pose', atDay(now, 0, '17:30'), 'booked', { attribution: 'acquisition', origin: 'voice' })
+  add('c07', 'depose-pose', atDay(now, 0, '17:30'), 'booked', { attribution: 'voice', origin: 'voice', bookedAt: new Date(n - 3 * D + 5 * H) })
 
   /* ---------- Semaine à venir ---------- */
-  add('c06', 'remplissage', atOpenDay(now, 1, '11:00'), 'confirmed')
+  add('c06', 'remplissage', atOpenDay(now, 1, '10:00'), 'confirmed')
   add('c08', 'pose-gel', atOpenDay(now, 2, '10:00'), 'booked', { attribution: 'acquisition' })
   add('c09', 'remplissage', atOpenDay(now, 3, '10:30'), 'booked')
   add('c10', 'semi-permanent', atOpenDay(now, 4, '14:00'), 'booked')
@@ -203,8 +216,14 @@ export function createSeed(now: Date): DemoState {
   const cancelled = add('c11', 'remplissage', slot, 'cancelled')
   cancelled.history.push({ at: new Date(n - 5 * H).toISOString(), from: 'confirmed', to: 'cancelled', source: 'client' })
 
+  /* ---------- NOVIA Voice : l'appel de Sarah (14h18) a créé un RDV ---------- */
+  const callSarahAt = atDay(now, 0, '14:18')
+  const sarahRdv = add('c24', 'pose-gel', atOpenDay(now, 1, '11:30'), 'booked', { attribution: 'voice', origin: 'voice', bookedAt: new Date(callSarahAt.getTime() + 3 * 60_000) })
+
   const customer = (id: string) => customers.find((c) => c.id === id)!
   customer('c12').noShowRecovered = true
+  Object.assign(customer('c23'), { createdAt: new Date(n - 26 * H).toISOString(), lastActivityAt: new Date(n - 26 * H).toISOString() })
+  Object.assign(customer('c24'), { createdAt: callSarahAt.toISOString(), lastActivityAt: callSarahAt.toISOString(), phone: '06 00 00 77 18', email: 'sarah.benoit@exemple.demo' })
 
   /* ---------- Workflows en cours (démo) ---------- */
   const runs: WorkflowRun[] = [
@@ -282,5 +301,173 @@ export function createSeed(now: Date): DemoState {
     waitlist,
     messages: [],
     voice: { active: true, mode: 'missed' },
+    conversations: seedConversations(now),
+    calls: seedCalls(now, { sarah: sarahRdv.id, yasmine: appointments.find((a) => a.customerId === 'c07')!.id }),
+    settings: structuredClone(defaultSettings),
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Conversations de démonstration                                       */
+/* ------------------------------------------------------------------ */
+
+function seedConversations(now: Date): Conversation[] {
+  const n = now.getTime()
+  const at = (minAgo: number) => new Date(n - minAgo * 60_000).toISOString()
+  let k = 0
+  const m = (minAgo: number, from: 'client' | 'novia' | 'pro', body: string, faqId?: string) => ({ id: `cm${++k}`, at: at(minAgo), from, body, ...(faqId ? { faqId } : {}) })
+  return [
+    {
+      id: 'conv-c09',
+      customerId: 'c09',
+      channel: 'instagram',
+      needsHuman: true,
+      needsHumanReason: 'Demande sur mesure : aucune réponse approuvée',
+      unread: true,
+      messages: [m(42, 'client', 'Bonjour ! Je me marie le 12 décembre, est-ce que vous faites des french avec des paillettes dorées ? Et ce serait combien pour moi et deux témoins ?')],
+    },
+    {
+      id: 'conv-c08',
+      customerId: 'c08',
+      channel: 'sms',
+      needsHuman: true,
+      needsHumanReason: 'Sujet sensible : réaction cutanée',
+      unread: true,
+      messages: [m(95, 'client', 'Bonjour Léa, j’ai un peu de rougeur autour des ongles depuis ma dernière pose, est-ce que c’est une réaction allergique ? Je viens après-demain.')],
+    },
+    {
+      id: 'conv-c05',
+      customerId: 'c05',
+      channel: 'sms',
+      needsHuman: false,
+      unread: false,
+      messages: [
+        m(130, 'client', 'Coucou, est-ce que je peux venir ce soir avec un ongle cassé ?'),
+        m(129, 'novia', 'Oui, venez telle quelle : Léa prévoit quelques minutes pour réparer l’ongle avant la pose. Si plusieurs ongles sont abîmés, dites-le-nous pour ajuster le temps.', 'ongle-casse'),
+        m(120, 'client', 'Super merci 🙏'),
+      ],
+    },
+    {
+      id: 'conv-c23',
+      customerId: 'c23',
+      channel: 'instagram',
+      needsHuman: false,
+      unread: false,
+      messages: [
+        m(26 * 60, 'client', 'Bonjour, quels sont vos tarifs pour une pose gel ?'),
+        m(26 * 60 - 1, 'novia', 'Pose complète gel : 70 €, remplissage : 45 €, semi-permanent : 35 €, nail art à partir de 15 € (tarifs de démonstration). Vous pouvez réserver directement en ligne.', 'tarifs'),
+      ],
+    },
+    {
+      id: 'conv-c20',
+      customerId: 'c20',
+      channel: 'sms',
+      needsHuman: false,
+      unread: false,
+      messages: [
+        m(3 * 24 * 60, 'client', 'Léa, je voulais te parler de la dernière fois, je n’étais pas très contente de la forme…'),
+        m(3 * 24 * 60 - 30, 'pro', 'Bonjour Mila, merci de me l’avoir dit. Je te propose de passer quand tu veux cette semaine, je reprends la forme sans frais.'),
+      ],
+    },
+  ]
+}
+
+/* ------------------------------------------------------------------ */
+/* Appels NOVIA Voice de démonstration (fictifs)                        */
+/* ------------------------------------------------------------------ */
+
+function seedCalls(now: Date, ids: { sarah: string; yasmine: string }): VoiceCall[] {
+  const n = now.getTime()
+  const today = (hhmm: string) => atDay(now, 0, hhmm).toISOString()
+  return [
+    {
+      id: 'call-1418',
+      at: today('14:18'),
+      callerName: 'Sarah Benoît',
+      phone: '06 00 00 77 18',
+      customerId: 'c24',
+      durationSec: 154,
+      trigger: 'missed',
+      handledBy: 'novia',
+      outcome: 'booked',
+      summary: 'Demande de tarif pour une pose complète → RDV vendredi 11h30',
+      appointmentId: ids.sarah,
+      transcript: [
+        { from: 'novia', text: 'NOVIA Nails, bonjour ! Léa est en prestation, je suis son assistante. Comment puis-je vous aider ?' },
+        { from: 'caller', text: 'Bonjour, je voulais savoir le prix d’une pose complète.' },
+        { from: 'novia', text: 'Une pose complète gel est à 70 €, comptez environ deux heures. Voulez-vous que je regarde les disponibilités ?' },
+        { from: 'caller', text: 'Oui, plutôt en fin de matinée.' },
+        { from: 'novia', text: 'Je peux vous proposer demain vendredi à 11h30, ou samedi à 10h. Lequel vous convient ?' },
+        { from: 'caller', text: 'Vendredi 11h30, parfait.' },
+        { from: 'novia', text: 'C’est noté : vendredi à 11h30, pose complète. Vous recevrez une confirmation par SMS. Puis-je avoir votre nom ?' },
+        { from: 'caller', text: 'Sarah Benoît.' },
+      ],
+    },
+    {
+      id: 'call-1205',
+      at: today('12:05'),
+      callerName: 'Lucie Bonnet',
+      phone: '06 00 00 19 29',
+      customerId: 'c10',
+      durationSec: 48,
+      trigger: 'missed',
+      handledBy: 'novia',
+      outcome: 'transferred',
+      summary: 'Souhaite parler à Léa d’un changement de couleur → rappel demandé',
+      transcript: [
+        { from: 'novia', text: 'NOVIA Nails, bonjour ! Léa est en prestation, je suis son assistante.' },
+        { from: 'caller', text: 'Je voudrais parler à Léa directement, c’est pour mon rendez-vous de la semaine prochaine.' },
+        { from: 'novia', text: 'Bien sûr. Je préviens Léa, elle vous rappelle dès qu’elle a terminé. C’est bien au 06 00 00 19 29 ?' },
+        { from: 'caller', text: 'Oui, merci.' },
+      ],
+    },
+    {
+      id: 'call-1140',
+      at: today('11:40'),
+      callerName: 'Numéro inconnu',
+      phone: '06 00 00 55 03',
+      durationSec: 36,
+      trigger: 'missed',
+      handledBy: 'novia',
+      outcome: 'answered',
+      summary: 'Question sur l’accès au salon → réponse donnée',
+      transcript: [
+        { from: 'caller', text: 'Bonjour, il y a un parking près du salon ?' },
+        { from: 'novia', text: 'L’adresse et l’accès figurent dans votre confirmation de rendez-vous. Souhaitez-vous prendre rendez-vous ?' },
+        { from: 'caller', text: 'Pas pour l’instant, merci.' },
+      ],
+    },
+    {
+      id: 'call-1030',
+      at: today('10:30'),
+      callerName: 'Rose Gauthier',
+      phone: '06 00 00 28 38',
+      customerId: 'c19',
+      durationSec: 95,
+      trigger: 'all',
+      handledBy: 'pro',
+      outcome: 'answered',
+      summary: 'Appel pris par Léa',
+      transcript: [],
+    },
+    {
+      id: 'call-2015',
+      at: new Date(n - 3 * D + 5 * H).toISOString(),
+      callerName: 'Yasmine Haddad',
+      phone: '06 00 00 16 26',
+      customerId: 'c07',
+      durationSec: 131,
+      trigger: 'after_hours',
+      handledBy: 'novia',
+      outcome: 'booked',
+      summary: 'Appel hors horaires : dépose + nouvelle pose → RDV jeudi 17h30',
+      appointmentId: ids.yasmine,
+      transcript: [
+        { from: 'novia', text: 'NOVIA Nails, bonsoir ! Le salon est fermé, mais je peux vous aider à prendre rendez-vous.' },
+        { from: 'caller', text: 'J’ai une pose faite ailleurs, je voudrais la refaire.' },
+        { from: 'novia', text: 'Je vous propose une dépose suivie d’une nouvelle pose, environ 2 h 30. Jeudi à 17h30, ça vous va ?' },
+        { from: 'caller', text: 'Oui, très bien.' },
+      ],
+    },
+  ]
 }

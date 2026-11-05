@@ -6,6 +6,6 @@
 import { notConnected } from '../notConnected'
 import type { PaymentProvider, VoiceProvider } from '../types'
 
-export const LiveVoiceProvider = notConnected<VoiceProvider>('LiveVoiceProvider', { getSettings: true, setSettings: true })
+export const LiveVoiceProvider = notConnected<VoiceProvider>('LiveVoiceProvider', { getSettings: true, setSettings: true, listCalls: true, logCall: true })
 
 export const LivePaymentProvider = notConnected<PaymentProvider>('LivePaymentProvider', { recordDemoPayment: true })
