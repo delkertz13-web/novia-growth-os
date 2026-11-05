@@ -10,11 +10,15 @@ import { Icon } from './Icon'
 /** Instantané métier courant, relu à chaque changement (via le domaine NOVIA). */
 export const useDemoState = () => useSyncExternalStore(novia.subscribe, novia.snapshot)
 
-/** Horloge partagée : les états « à confirmer » évoluent avec l'heure réelle. */
+/**
+ * « Maintenant » selon l'horloge NOVIA. En démo, l'heure de référence ne bouge pas :
+ * aucun minuteur. Avec une horloge système, relue toutes les 30 s.
+ */
 export function useNow(intervalMs = 30_000) {
-  const [now, setNow] = useState(() => new Date())
+  const [now, setNow] = useState(() => novia.now())
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), intervalMs)
+    if (novia.clockMode === 'demo') return
+    const t = setInterval(() => setNow(novia.now()), intervalMs)
     return () => clearInterval(t)
   }, [intervalMs])
   return now

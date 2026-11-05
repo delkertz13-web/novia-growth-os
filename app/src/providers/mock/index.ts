@@ -34,9 +34,9 @@ import type {
   SyncProvider,
   VoiceProvider,
 } from '../types'
-import { getState, nextId, resetDemo, setState, subscribe } from './store'
+import { demoClock, getState, nextId, resetDemo, setState, subscribe } from './store'
 
-const now = () => new Date()
+const now = () => demoClock.now()
 const upsert = <T extends { id: string }>(list: T[], item: T) =>
   list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item]
 const fullName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : 'Cliente')
@@ -389,7 +389,7 @@ export const engine = {
 }
 
 function firstAvailableSlot(serviceId: string): Date | undefined {
-  const d = new Date()
+  const d = now()
   for (let i = 1; i < 21; i++) {
     const day = new Date(d)
     day.setDate(d.getDate() + i)
@@ -418,6 +418,7 @@ export const MockDemoControls: DemoControls = {
 }
 
 export const providers: Providers = {
+  clock: demoClock,
   sync: MockSyncProvider,
   automation: MockAutomationProvider,
   demo: MockDemoControls,

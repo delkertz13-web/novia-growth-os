@@ -15,7 +15,7 @@ function nextFreeSlot(): Date | undefined {
   const active = services.filter((s) => s.active)
   if (!active.length) return undefined
   const shortest = active.reduce((a, b) => (b.durationMin < a.durationMin ? b : a))
-  const day = new Date()
+  const day = novia.now()
   day.setHours(0, 0, 0, 0)
   for (let i = 0; i < 14; i++) {
     const d = new Date(day)

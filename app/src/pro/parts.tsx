@@ -84,7 +84,7 @@ export function ReschedulePicker({
 }) {
   const [dayIdx, setDayIdx] = useState(0)
   const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date()
+    const d = novia.now()
     d.setHours(0, 0, 0, 0)
     d.setDate(d.getDate() + i + 1)
     return { d, slots: novia.pro.availableSlots(d, a.serviceId) }

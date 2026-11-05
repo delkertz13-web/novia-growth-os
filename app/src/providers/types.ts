@@ -84,6 +84,19 @@ export interface AnalyticsProvider {
 }
 
 /* ------------------------------------------------------------------ */
+/* Horloge                                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * « Maintenant » pour NOVIA. En démo : heure de référence contrôlée ; en production :
+ * heure système du salon. Rien d'autre ne doit lire l'heure.
+ */
+export interface ClockProvider {
+  readonly mode: 'demo' | 'system'
+  now(): Date
+}
+
+/* ------------------------------------------------------------------ */
 /* Lecture de l'état métier                                             */
 /* ------------------------------------------------------------------ */
 
@@ -143,6 +156,7 @@ export interface DemoControls {
 }
 
 export interface Providers {
+  clock: ClockProvider
   sync: SyncProvider
   automation: AutomationProvider
   demo?: DemoControls

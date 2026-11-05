@@ -30,17 +30,10 @@ export interface DemoState {
   voice: { active: boolean; mode: 'all' | 'missed' | 'after_hours' }
 }
 
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 
 const H = 3_600_000
 const D = 24 * H
-
-/** arrondi à la demi-heure inférieure */
-const roundHalfHour = (t: number) => {
-  const d = new Date(t)
-  d.setMinutes(d.getMinutes() < 30 ? 0 : 30, 0, 0)
-  return d
-}
 
 const atDay = (base: Date, dayOffset: number, hhmm: string) => {
   const d = new Date(base)
@@ -58,6 +51,18 @@ const atOpenDay = (base: Date, k: number, hhmm: string) => {
     const d = new Date(base)
     d.setDate(d.getDate() + offset)
     if (business.openingHours.value[d.getDay()]) found++
+  }
+  return atDay(base, offset, hhmm)
+}
+
+/** il y a `daysAgo` jours, ramené au jour d'ouverture précédent si le salon était fermé */
+const atOpenDayBack = (base: Date, daysAgo: number, hhmm: string) => {
+  let offset = -daysAgo
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(base)
+    d.setDate(d.getDate() + offset)
+    if (business.openingHours.value[d.getDay()]) break
+    offset--
   }
   return atDay(base, offset, hhmm)
 }
@@ -96,7 +101,13 @@ const people: C[] = [
   ['c22', 'Eva', 'Morel', 'site'],
 ]
 
-export function createSeed(now = new Date()): DemoState {
+/**
+ * Le scénario est construit autour de `now`, l'heure de référence de l'horloge de démo
+ * (src/config/demo.ts) : jamais l'heure réelle. Les RDV du jour ont des heures fixes,
+ * dans les horaires d'ouverture ; scenario.test.ts vérifie que la référence choisie
+ * produit bien toutes les situations de la démonstration.
+ */
+export function createSeed(now: Date): DemoState {
   const n = now.getTime()
   let refNo = 100
 
@@ -146,15 +157,15 @@ export function createSeed(now = new Date()): DemoState {
   }
 
   /* ---------- Aujourd'hui ---------- */
-  add('c22', 'semi-permanent', roundHalfHour(n - 6 * H), 'showed', { paid: true })
+  add('c22', 'semi-permanent', atDay(now, 0, '10:00'), 'showed', { paid: true })
   // À confirmer : l'heure est passée, la présence est INCONNUE
-  add('c01', 'remplissage', roundHalfHour(n - 2.5 * H), 'confirmed')
-  add('c02', 'pose-gel', roundHalfHour(n - 4.5 * H), 'confirmed', { attribution: 'acquisition' })
-  // À venir
-  add('c03', 'semi-permanent', roundHalfHour(n + 1 * H), 'confirmed')
-  add('c04', 'remplissage', roundHalfHour(n + 2 * H), 'confirmed', { attribution: 'referral' })
-  add('c05', 'nail-art', roundHalfHour(n + 3 * H), 'booked')
-  add('c07', 'depose-pose', roundHalfHour(n + 3.5 * H), 'booked', { attribution: 'acquisition', origin: 'voice' })
+  add('c02', 'pose-gel', atDay(now, 0, '11:00'), 'confirmed', { attribution: 'acquisition' })
+  add('c01', 'remplissage', atDay(now, 0, '13:00'), 'confirmed')
+  // En cours, puis à venir
+  add('c03', 'semi-permanent', atDay(now, 0, '14:30'), 'confirmed')
+  add('c04', 'remplissage', atDay(now, 0, '16:00'), 'confirmed', { attribution: 'referral' })
+  add('c05', 'nail-art', atDay(now, 0, '17:00'), 'booked')
+  add('c07', 'depose-pose', atDay(now, 0, '17:30'), 'booked', { attribution: 'acquisition', origin: 'voice' })
 
   /* ---------- Semaine à venir ---------- */
   add('c06', 'remplissage', atOpenDay(now, 1, '11:00'), 'confirmed')
@@ -163,26 +174,28 @@ export function createSeed(now = new Date()): DemoState {
   add('c10', 'semi-permanent', atOpenDay(now, 4, '14:00'), 'booked')
 
   /* ---------- Historique (prestations attestées) ---------- */
-  add('c06', 'pose-gel', new Date(n - 12 * D), 'showed', { paid: true })
-  add('c08', 'semi-permanent', new Date(n - 8 * D), 'showed', { paid: true, attribution: 'acquisition' })
-  add('c09', 'remplissage', new Date(n - 9 * D), 'showed', { paid: true })
-  add('c10', 'remplissage', new Date(n - 4 * D), 'showed', { attribution: 'smartfill', origin: 'smartfill' })
-  add('c03', 'pose-gel', new Date(n - 14 * D), 'showed', { paid: true, attribution: 'acquisition' })
-  add('c04', 'pose-gel', new Date(n - 13 * D), 'showed', { paid: true, attribution: 'referral' })
-  add('c05', 'remplissage', new Date(n - 6 * D), 'showed', { paid: true })
-  add('c11', 'pose-gel', new Date(n - 10 * D), 'showed', { paid: true })
+  add('c06', 'pose-gel', atOpenDayBack(now, 12, '10:30'), 'showed', { paid: true })
+  add('c08', 'semi-permanent', atOpenDayBack(now, 8, '15:00'), 'showed', { paid: true, attribution: 'acquisition' })
+  add('c09', 'remplissage', atOpenDayBack(now, 9, '11:00'), 'showed', { paid: true })
+  add('c10', 'remplissage', atOpenDayBack(now, 4, '15:00'), 'showed', { attribution: 'smartfill', origin: 'smartfill' })
+  add('c03', 'pose-gel', atOpenDayBack(now, 14, '14:00'), 'showed', { paid: true, attribution: 'acquisition' })
+  add('c04', 'pose-gel', atOpenDayBack(now, 13, '10:00'), 'showed', { paid: true, attribution: 'referral' })
+  add('c05', 'remplissage', atOpenDayBack(now, 6, '10:00'), 'showed', { paid: true })
+  add('c11', 'pose-gel', atOpenDayBack(now, 10, '13:00'), 'showed', { paid: true })
   // Remplissages à prévoir (délais fictifs : 19 et 23 jours…)
-  add('c14', 'remplissage', new Date(n - 19 * D), 'showed', { paid: true })
-  add('c15', 'remplissage', new Date(n - 23 * D), 'showed', { paid: true })
-  add('c16', 'remplissage', new Date(n - 21 * D), 'showed', { paid: true })
-  add('c17', 'remplissage', new Date(n - 25 * D), 'showed', { paid: true })
+  add('c14', 'remplissage', atOpenDayBack(now, 19, '11:00'), 'showed', { paid: true })
+  add('c15', 'remplissage', atOpenDayBack(now, 23, '14:00'), 'showed', { paid: true })
+  add('c16', 'remplissage', atOpenDayBack(now, 21, '15:30'), 'showed', { paid: true })
+  add('c17', 'remplissage', atOpenDayBack(now, 25, '10:30'), 'showed', { paid: true })
 
   /* ---------- No-shows du mois : 2, dont 1 récupéré ---------- */
-  const ns1 = add('c12', 'remplissage', new Date(n - 10 * D), 'no_show')
-  ns1.history.push({ at: new Date(n - 10 * D + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'cockpit' })
+  const ns1 = add('c12', 'remplissage', atOpenDayBack(now, 10, '11:00'), 'no_show')
+  const t1 = new Date(ns1.start).getTime()
+  ns1.history.push({ at: new Date(t1 + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'cockpit' })
   const rec = add('c12', 'remplissage', atOpenDay(now, 3, '12:00'), 'booked', { attribution: 'noshow_recovery', origin: 'recovery' })
-  const ns2 = add('c13', 'semi-permanent', new Date(n - 6 * D), 'no_show')
-  ns2.history.push({ at: new Date(n - 6 * D + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'sms' })
+  const ns2 = add('c13', 'semi-permanent', atOpenDayBack(now, 6, '14:00'), 'no_show')
+  const t2 = new Date(ns2.start).getTime()
+  ns2.history.push({ at: new Date(t2 + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'sms' })
 
   /* ---------- Annulation : créneau libre vendredi 15h30 ---------- */
   const fri = nextFriday(now)
@@ -203,13 +216,13 @@ export function createSeed(now = new Date()): DemoState {
       state: 'completed',
       step: 'done',
       messagesSent: 1,
-      startedAt: new Date(n - 10 * D + 3 * H).toISOString(),
-      endedAt: new Date(n - 9 * D).toISOString(),
+      startedAt: new Date(t1 + 3 * H).toISOString(),
+      endedAt: new Date(t1 + 24 * H).toISOString(),
       outcome: 'recovered',
       actions: [
-        { at: new Date(n - 10 * D + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par la professionnelle.' },
-        { at: new Date(n - 10 * D + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
-        { at: new Date(n - 9 * D).toISOString(), kind: 'stop', label: 'Nouveau rendez-vous réservé : STOP → W02. NO_SHOW_RECOVERED = TRUE' },
+        { at: new Date(t1 + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par la professionnelle.' },
+        { at: new Date(t1 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
+        { at: new Date(t1 + 24 * H).toISOString(), kind: 'stop', label: 'Nouveau rendez-vous réservé : STOP → W02. NO_SHOW_RECOVERED = TRUE' },
       ],
     },
     {
@@ -220,11 +233,11 @@ export function createSeed(now = new Date()): DemoState {
       state: 'active',
       step: 'await_reply',
       messagesSent: 1,
-      startedAt: new Date(n - 6 * D + 3 * H).toISOString(),
+      startedAt: new Date(t2 + 3 * H).toISOString(),
       actions: [
-        { at: new Date(n - 6 * D + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par validation SMS.' },
-        { at: new Date(n - 6 * D + 6 * H).toISOString(), kind: 'check_ok', label: 'Revérification : statut, nouveau RDV, opposition, reprise humaine — OK.' },
-        { at: new Date(n - 6 * D + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
+        { at: new Date(t2 + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par validation SMS.' },
+        { at: new Date(t2 + 6 * H).toISOString(), kind: 'check_ok', label: 'Revérification : statut, nouveau RDV, opposition, reprise humaine — OK.' },
+        { at: new Date(t2 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
       ],
     },
     {

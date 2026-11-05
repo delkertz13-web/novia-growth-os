@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { business } from '../config/business.demo'
+import { novia } from '../domain'
 import type { ServiceConfig } from '../config/schema'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Photo } from '../ui/common'
@@ -26,7 +27,7 @@ export function ServiceRow({ service: s }: { service: ServiceConfig }) {
 const weekdays = [1, 2, 3, 4, 5, 6, 0]
 
 export function HoursCard() {
-  const today = new Date().getDay()
+  const today = novia.now().getDay()
   const hours = business.openingHours.value
   return (
     <div className="card" style={{ padding: 22 }}>

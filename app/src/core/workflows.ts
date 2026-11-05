@@ -133,8 +133,11 @@ export function reminderTimes(a: Appointment, rules: WorkflowRules, now: Date): 
 /* W03 / W04 — séquence de récupération                                 */
 /* ------------------------------------------------------------------ */
 
-let seq = 0
-const runId = (wf: WorkflowId) => `run-${wf}-${Date.now().toString(36)}-${(seq++).toString(36)}`
+/**
+ * Identifiant déterministe : une séquence par RDV et par validation (l'historique du
+ * statut grandit à chaque validation, une correction ouvre donc un nouvel identifiant).
+ */
+const runId = (wf: WorkflowId, source: Appointment) => `run-${wf}-${source.id}-${source.history.length}`
 
 const act = (now: Date, kind: WorkflowAction['kind'], label: string): WorkflowAction => ({
   at: now.toISOString(),
@@ -156,7 +159,7 @@ export function startRecovery(
   }
   const wait = workflow === 'W03' ? rules.w03.waitBeforeRecoveryHours : rules.w04.waitBeforeRecoveryHours
   return {
-    id: runId(workflow),
+    id: runId(workflow, source),
     workflow,
     customerId: source.customerId,
     appointmentId: source.id,

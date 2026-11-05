@@ -58,7 +58,7 @@ export function Booking() {
 
   const days = useMemo(() => {
     const out: { date: Date; count: number }[] = []
-    const base = new Date()
+    const base = novia.now()
     base.setHours(0, 0, 0, 0)
     for (let i = 0; i < 21; i++) {
       const d = new Date(base)
@@ -102,7 +102,7 @@ export function Booking() {
     if (!service || !slot || sending || done) return
     const create = () => {
       const a = novia.client.book({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
-      setBookedAt(new Date())
+      setBookedAt(novia.now())
       setDone(a)
     }
     // Le bouton réagit, le décor se calme et le ticket se recentre, puis la réservation se pose.

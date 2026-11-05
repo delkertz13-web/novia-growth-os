@@ -120,7 +120,7 @@ describe('providers préparés, non connectés', () => {
 describe('parcours complet avec les providers Mock', () => {
   it('Absente → récupération W04 démarrée → 45 € à récupérer en plus', () => {
     const novia = createNovia(mockProviders, { rules, services })
-    const now = new Date()
+    const now = novia.now()
     const before = novia.pro.cockpit(now)
     const target = before.toConfirm.find((a) => a.price === 45)!
     const res = novia.pro.declareAbsence(target.id)
@@ -136,7 +136,7 @@ describe('parcours complet avec les providers Mock', () => {
     const run = novia.snapshot().runs.find((r) => r.state === 'active')!
     novia.pro.takeOverConversation(run.customerId)
     expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('stopped')
-    expect(novia.pro.customerFile(run.customerId, new Date())!.contactable).toBe(false)
+    expect(novia.pro.customerFile(run.customerId, novia.now())!.contactable).toBe(false)
     novia.pro.letNoviaHandle(run.customerId)
     expect(novia.snapshot().customers.find((c) => c.id === run.customerId)!.humanTakeover).toBe(false)
   })

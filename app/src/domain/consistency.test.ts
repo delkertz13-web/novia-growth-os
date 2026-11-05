@@ -15,7 +15,7 @@ import type { NoviaSnapshot } from '../providers/types'
 import { createNovia } from './intents'
 
 const novia = createNovia(providers, { rules, services })
-const now = () => new Date()
+const now = () => novia.now()
 const kpi = () => novia.pro.cockpit(now()).revenue
 const snap = () => novia.snapshot()
 const appt = (id: string) => snap().appointments.find((a) => a.id === id)!

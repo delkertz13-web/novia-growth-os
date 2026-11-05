@@ -876,3 +876,7 @@
     font-size: 21px;
   }
 }
+
+.ck-head__clock {
+  color: var(--ochre);
+}

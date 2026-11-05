@@ -84,6 +84,9 @@ export function createNovia(p: Providers, opts: NoviaOptions) {
   }
 
   return {
+    /** « Maintenant » pour NOVIA : heure de référence en démo, heure système en production. */
+    now: () => p.clock.now(),
+    clockMode: p.clock.mode,
     snapshot,
     subscribe: (l: () => void) => p.sync.subscribe(l),
     pro,

@@ -53,7 +53,10 @@ export function Dashboard() {
     <main className="wrap page ck">
       <header className="ck-head">
         <div>
-          <div className="ck-head__date">{capitalize(fmt.dayLong(now))}</div>
+          <div className="ck-head__date">
+            {capitalize(fmt.dayLong(now))}
+            {novia.clockMode === 'demo' && <span className="ck-head__clock"> · {fmt.time(now)} (démo)</span>}
+          </div>
           <h1 className="display">Bonjour {business.artistFirstName.value}</h1>
         </div>
         <div className="avatar" aria-hidden="true">
