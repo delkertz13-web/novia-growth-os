@@ -4,7 +4,7 @@ import '@fontsource-variable/inter'
 import './styles/app.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, useParams } from 'react-router-dom'
 import { Booking } from './client/Booking'
 import { ClientLayout } from './client/ClientLayout'
 import { Gallery } from './client/Gallery'
@@ -13,6 +13,10 @@ import { Infos, Services } from './client/Services'
 import { Agenda } from './pro/Agenda'
 import { AppointmentDetail } from './pro/AppointmentDetail'
 import { CustomerFile } from './pro/CustomerFile'
+import { Customers } from './pro/Customers'
+import { Conversation, Messages } from './pro/Messages'
+import { Settings } from './pro/Settings'
+import { Voice } from './pro/Voice'
 import { Dashboard } from './pro/Dashboard'
 import { Novia } from './pro/Novia'
 import { ProLayout } from './pro/ProLayout'
@@ -27,6 +31,11 @@ function Root() {
       <Outlet />
     </>
   )
+}
+
+function LegacyCustomer() {
+  const { id } = useParams()
+  return <Navigate to={`/pro/clientes/${id}`} replace />
 }
 
 const router = createBrowserRouter([
@@ -50,9 +59,16 @@ const router = createBrowserRouter([
           { index: true, element: <Dashboard /> },
           { path: 'agenda', element: <Agenda /> },
           { path: 'rdv/:id', element: <AppointmentDetail /> },
-          { path: 'cliente/:id', element: <CustomerFile /> },
+          { path: 'clientes', element: <Customers /> },
+          { path: 'clientes/:id', element: <CustomerFile /> },
+          // ancienne adresse de la fiche (Lot 5)
+          { path: 'cliente/:id', element: <LegacyCustomer /> },
+          { path: 'messages', element: <Messages /> },
+          { path: 'messages/:id', element: <Conversation /> },
           { path: 'novia', element: <Novia /> },
+          { path: 'voice', element: <Voice /> },
           { path: 'revenue', element: <Revenue /> },
+          { path: 'reglages', element: <Settings /> },
         ],
       },
       { path: '*', element: <Home /> },

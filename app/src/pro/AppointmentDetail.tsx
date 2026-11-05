@@ -3,7 +3,7 @@ import { serviceById } from '../config/services.demo'
 import { attendanceState, isAwaitingValidation, noShowCounts, statusLabels } from '../core/appointmentStatus'
 import { appointmentLevel, formatEUR, levelLabels, sourceLabels } from '../core/revenue'
 import { buildValidationSms } from '../core/smsValidation'
-import { novia } from '../domain'
+import { novia, originLabels } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, SimBadge, StatusPill, useDemoState, useNow } from '../ui/common'
 import { customerName, OutcomeButtons, RunCard } from './parts'
@@ -60,7 +60,7 @@ export function AppointmentDetail() {
         </div>
         <div>
           {c ? (
-            <Link to={`/pro/cliente/${c.id}`} className="detail-hero__who">
+            <Link to={`/pro/clientes/${c.id}`} className="detail-hero__who">
               {customerName(c)} <Icon name="chevronRight" size={16} />
             </Link>
           ) : (
@@ -75,6 +75,8 @@ export function AppointmentDetail() {
           <dd>{fmt.eur(a.price)}</dd>
           <dt>Niveau de revenu</dt>
           <dd>{level ? levelLabels[level] : 'Aucun'}</dd>
+          <dt>Pris via</dt>
+          <dd>{originLabels[a.bookingOrigin]}</dd>
           <dt>Attribution</dt>
           <dd>{sourceLabels[a.attribution]}</dd>
           <dt>No-shows (30 j / 90 j / total)</dt>

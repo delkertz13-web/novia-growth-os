@@ -4,7 +4,7 @@ import { serviceById, services } from '../config/services.demo'
 import { formatEUR } from '../core/revenue'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, Customer, Opportunity } from '../core/types'
-import { novia, type SmartFillFunnel, type VoiceMode } from '../domain'
+import { novia, type SmartFillFunnel } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
 import { customerName, RunCard, StatTile } from './parts'
@@ -18,10 +18,13 @@ export function Novia() {
 
   const slots = st.opportunities.filter((o) => o.kind === 'smartfill')
   const runs = [...st.runs].sort((a, b) => {
-    if (a.state !== b.state) return a.state === 'active' ? -1 : 1
+    const rank = (x: typeof a) => (x.state === 'active' ? 0 : x.state === 'paused' ? 1 : 2)
+    if (rank(a) !== rank(b)) return rank(a) - rank(b)
     return b.startedAt.localeCompare(a.startedAt)
   })
   const refills = refillsDue(st.customers, st.appointments, services, now)
+  const voice = novia.pro.voiceStats()
+  const won = novia.pro.cockpit(now).revenue.noviaWonThisMonth
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const recentNoShows = st.appointments.filter((a) => a.status === 'no_show' && new Date(a.start) >= new Date(now.getTime() - 30 * 86_400_000))
@@ -33,10 +36,31 @@ export function Novia() {
       <header className="p-head">
         <div>
           <div className="p-head__date">NOVIA</div>
-          <h1 className="display">Ce que NOVIA ferait</h1>
+          <h1 className="display">Votre assistante</h1>
         </div>
       </header>
-      <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
+
+      <nav className="hub" aria-label="Espaces NOVIA">
+        <Link to="/pro/voice" className="hub__tile hub__tile--voice">
+          <Icon name="phone" size={20} />
+          <strong>Voice</strong>
+          <span>
+            {voice.received} appels · {voice.booked} RDV créés
+          </span>
+        </Link>
+        <Link to="/pro/revenue" className="hub__tile">
+          <Icon name="chart" size={20} />
+          <strong>Revenue</strong>
+          <span>{formatEUR(won)} gagnés ce mois</span>
+        </Link>
+        <Link to="/pro/reglages" className="hub__tile">
+          <Icon name="settings" size={20} />
+          <strong>Réglages</strong>
+          <span>Automatisations, horaires</span>
+        </Link>
+      </nav>
+
+      <p className="muted" style={{ margin: '18px 0 0', fontSize: 14 }}>
         Toutes les actions ci-dessous sont simulées : aucun message n’est envoyé, aucune cliente n’est contactée.
       </p>
 
@@ -74,7 +98,7 @@ export function Novia() {
         <div style={{ display: 'grid', gap: 10 }}>
           {runs.map((r) => (
             <div key={r.id}>
-              <RunCard run={r} customer={byId(r.customerId)} compact={r.state !== 'active'} />
+              <RunCard run={r} customer={byId(r.customerId)} compact={r.state !== 'active' && r.state !== 'paused'} />
               {r.appointmentId && (
                 <Link to={`/pro/rdv/${r.appointmentId}`} className="link-arrow" style={{ margin: '8px 4px 0', fontSize: 13 }}>
                   Voir le rendez-vous d’origine <Icon name="arrowRight" size={14} />
@@ -91,7 +115,7 @@ export function Novia() {
         </div>
         <div className="timeline">
           {refills.map(({ customer, last, daysSince, recommended }) => (
-            <Link key={customer.id} to={`/pro/cliente/${customer.id}`} className="appt" style={{ gridTemplateColumns: '1fr auto' }}>
+            <Link key={customer.id} to={`/pro/clientes/${customer.id}`} className="appt" style={{ gridTemplateColumns: '1fr auto' }}>
               <div style={{ minWidth: 0 }}>
                 <div className="appt__who">{customerName(customer)}</div>
                 <div className="appt__what">
@@ -103,8 +127,6 @@ export function Novia() {
           ))}
         </div>
       </section>
-
-      <VoiceSection />
 
       <SmartFillSheet key={sfId ?? 'none'} id={sfId} onClose={() => setParams({}, { replace: true })} opportunity={slots.find((o) => o.id === sfId)} />
     </main>
@@ -239,44 +261,5 @@ function FunnelRow({ n, total, label }: { n: number; total: number; label: strin
       <span className="funnel__num">{n}</span>
       <span className="funnel__label">{label}</span>
     </div>
-  )
-}
-
-const voiceModes: { id: VoiceMode; label: string; hint: string }[] = [
-  { id: 'missed', label: 'Appels manqués', hint: 'NOVIA répond quand vous ne pouvez pas décrocher.' },
-  { id: 'after_hours', label: 'Hors horaires', hint: 'NOVIA répond quand le salon est fermé.' },
-  { id: 'all', label: 'Tous les appels', hint: 'NOVIA répond à chaque appel.' },
-]
-
-/** Configurer NOVIA Voice : intention métier, sans aucun appel réel en démo. */
-function VoiceSection() {
-  const st = useDemoState()
-  const v = st.voice
-  const mode = voiceModes.find((m) => m.id === v.mode) ?? voiceModes[0]
-  return (
-    <section className="p-section">
-      <div className="p-section__head">
-        <h2 className="p-section__title">
-          <Icon name="phone" size={20} /> NOVIA Voice
-        </h2>
-        <SimBadge label="Aucun appel réel" />
-      </div>
-      <article className="card voice">
-        <label className="voice__switch">
-          <span>
-            <strong>{v.active ? 'NOVIA répond au téléphone' : 'NOVIA Voice est en pause'}</strong>
-            <span className="muted">{v.active ? mode.hint : 'Les appels sonnent normalement.'}</span>
-          </span>
-          <input type="checkbox" role="switch" checked={v.active} onChange={(e) => novia.pro.configureVoice({ active: e.target.checked })} />
-        </label>
-        <div className="seg" role="radiogroup" aria-label="Quand NOVIA répond" aria-disabled={!v.active || undefined}>
-          {voiceModes.map((m) => (
-            <button key={m.id} role="radio" aria-checked={v.mode === m.id} className={v.mode === m.id ? 'is-active' : ''} disabled={!v.active} onClick={() => novia.pro.configureVoice({ mode: m.id })}>
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </article>
-    </section>
   )
 }

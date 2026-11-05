@@ -7,10 +7,10 @@ import type { VoiceMode } from '../providers/types'
 
 export type CallFilter = 'all' | 'missed' | 'after_hours'
 
-export const voiceModeLabels: Record<VoiceMode, { title: string; help: string }> = {
-  missed: { title: 'Appels manqués', help: 'NOVIA décroche quand vous ne pouvez pas répondre (en prestation).' },
-  after_hours: { title: 'Hors horaires', help: 'NOVIA répond uniquement quand le salon est fermé.' },
-  all: { title: 'Tous les appels', help: 'NOVIA répond à chaque appel et vous transfère si besoin.' },
+export const voiceModeLabels: Record<VoiceMode, { title: string; short: string; help: string }> = {
+  missed: { title: 'Appels manqués', short: 'Manqués', help: 'NOVIA décroche quand vous ne pouvez pas répondre (en prestation).' },
+  after_hours: { title: 'Hors horaires', short: 'Hors horaires', help: 'NOVIA répond uniquement quand le salon est fermé.' },
+  all: { title: 'Tous les appels', short: 'Tous', help: 'NOVIA répond à chaque appel et vous transfère si besoin.' },
 }
 
 export const callOutcomeLabels: Record<VoiceCall['outcome'], string> = {

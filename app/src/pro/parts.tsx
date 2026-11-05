@@ -11,6 +11,9 @@ export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}
 
 /* ---------------- Ligne de rendez-vous ---------------- */
 
+/** origine visible dans l'agenda quand NOVIA a obtenu le rendez-vous */
+const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'SmartFill', recovery: 'Récupération' }
+
 export function AppointmentRow({ a, customer, now }: { a: Appointment; customer?: Customer; now: Date }) {
   const s = serviceById(a.serviceId)
   const past = appointmentEnd(a).getTime() < now.getTime() && attendanceState(a, now) !== 'unknown'
@@ -22,7 +25,10 @@ export function AppointmentRow({ a, customer, now }: { a: Appointment; customer?
       </div>
       <div style={{ minWidth: 0 }}>
         <div className="appt__who">{customerName(customer)}</div>
-        <div className="appt__what">{s?.name}</div>
+        <div className="appt__what">
+          {s?.name}
+          {originTag[a.bookingOrigin] && <span className={`origin-tag origin-tag--${a.bookingOrigin}`}>{originTag[a.bookingOrigin]}</span>}
+        </div>
       </div>
       <div className="appt__right">
         <span className="appt__price">{fmt.eur(a.price)}</span>
@@ -190,6 +196,17 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
             </button>
           )}
         </>
+      ) : run.state === 'paused' ? (
+        <div className="run__paused">
+          <span>
+            <Icon name="pause" size={14} /> En pause : vous avez repris la conversation. Aucun message n’est envoyé.
+          </span>
+          {customer && (
+            <button className="btn btn--primary btn--sm" onClick={() => novia.pro.letNoviaHandle(customer.id)}>
+              <Icon name="sparkle" size={14} /> Rendre à NOVIA
+            </button>
+          )}
+        </div>
       ) : (
         <div className={`run__result ${run.outcome === 'recovered' ? '' : 'run__result--neutral'}`}>
           {outcomeText[run.outcome ?? 'stopped']}

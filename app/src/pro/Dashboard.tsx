@@ -59,9 +59,9 @@ export function Dashboard() {
           </div>
           <h1 className="display">Bonjour {business.artistFirstName.value}</h1>
         </div>
-        <div className="avatar" aria-hidden="true">
+        <Link to="/pro/reglages" className="avatar" aria-label="Réglages">
           {business.artistFirstName.value.charAt(0)}
-        </div>
+        </Link>
       </header>
 
       <p className="ck-pulse" aria-live="polite">
@@ -149,6 +149,30 @@ export function Dashboard() {
           </div>
         )}
       </section>
+
+      {view.needsReply.length > 0 && (
+        <section className="p-section" aria-labelledby="ck-reply">
+          <div className="p-section__head">
+            <h2 className="p-section__title" id="ck-reply">
+              Messages à traiter <span className="count">{view.needsReply.length}</span>
+            </h2>
+            <Link to="/pro/messages" className="link-arrow">
+              Messages <Icon name="arrowRight" size={16} />
+            </Link>
+          </div>
+          <div className="ck-replies">
+            {view.needsReply.map((i) => (
+              <Link key={i.conversation.id} to={`/pro/messages/${i.conversation.id}`} className="ck-reply">
+                <span className="ck-reply__who">
+                  {customerName(i.customer)}
+                  <span>{i.conversation.needsHumanReason}</span>
+                </span>
+                <span className="ck-reply__text">« {i.last?.body} »</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="p-section" aria-labelledby="ck-today">
         <div className="p-section__head">

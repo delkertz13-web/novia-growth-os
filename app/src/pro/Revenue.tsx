@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Icon } from '../ui/Icon'
 import { formatEUR, levelLabels, sourceLabels, type RevenueLevel } from '../core/revenue'
 import type { AttributionSource } from '../core/types'
 import { novia } from '../domain'
@@ -10,7 +12,7 @@ const defs: Record<RevenueLevel, string> = {
   confirmed: 'Prestation attestée ET preuve de paiement (fictive dans la démo).',
 }
 
-const shown: AttributionSource[] = ['acquisition', 'cancellation_recovery', 'noshow_recovery', 'reactivation', 'referral', 'smartfill']
+const shown: AttributionSource[] = ['acquisition', 'cancellation_recovery', 'noshow_recovery', 'reactivation', 'referral', 'smartfill', 'voice']
 
 export function Revenue() {
   useDemoState()
@@ -25,6 +27,9 @@ export function Revenue() {
   return (
     <main className="wrap page">
       <header className="p-head">
+        <Link to="/pro/novia" className="icon-btn" aria-label="Retour à NOVIA">
+          <Icon name="arrowLeft" size={18} />
+        </Link>
         <div>
           <div className="p-head__date">Revenue Attribution</div>
           <h1 className="display">D’où vient le revenu</h1>

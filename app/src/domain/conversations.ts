@@ -71,3 +71,6 @@ export function buildInbox(snap: Pick<NoviaSnapshot, 'conversations' | 'customer
 
 export const needsHumanCount = (snap: Pick<NoviaSnapshot, 'conversations' | 'customers'>) =>
   buildInbox(snap).filter((i) => i.state === 'needs_human').length
+
+/** Réponses que NOVIA a le droit d'utiliser seule (approuvées par la professionnelle). */
+export const approvedAnswersList = () => approvedAnswers
