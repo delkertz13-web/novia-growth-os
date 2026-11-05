@@ -5,7 +5,8 @@
  */
 import type { ServiceConfig } from '../config/schema'
 import { attendanceState, isActiveBooking, isAwaitingValidation, noShowCounts } from '../core/appointmentStatus'
-import type { RevenueReport } from '../core/revenue'
+import { appointmentLevel, type RevenueReport } from '../core/revenue'
+import { isSlotFree } from '../core/availability'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowAction, WorkflowId, WorkflowRun } from '../core/types'
 import type { NoviaSnapshot } from '../providers/types'
@@ -87,21 +88,31 @@ export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'custo
 
 const noviaSources: AttributionSource[] = ['smartfill', 'cancellation_recovery', 'noshow_recovery']
 
+/**
+ * Trois niveaux, jamais mélangés : potentiel (pas encore regagné), réservé (rendez-vous
+ * pris, pas encaissé), confirmé (prestation attestée + preuve de paiement).
+ */
+export interface CockpitRevenue {
+  /** RDV du jour au niveau « réservé » (actifs, ou présence attestée sans preuve). */
+  todayBooked: number
+  /** RDV du jour au niveau « confirmé » (présence attestée + preuve de paiement). */
+  todayConfirmed: number
+  /** Potentiel : RDV perdus (absence, annulation) pas encore regagnés, toutes dates. */
+  toRecover: number
+  /** Ce mois (date du RDV) : RDV obtenus par NOVIA (SmartFill, récupérations), réservé + confirmé. */
+  noviaWonThisMonth: number
+  /** dont la part confirmée (prestation attestée + preuve). */
+  noviaConfirmedThisMonth: number
+}
+
 export interface CockpitView {
   today: TodayItem[]
   /** présences à confirmer, toutes dates, les plus anciennes en dernier */
   toConfirm: Appointment[]
   freedSlots: Opportunity[]
   recoveries: { active: WorkflowRun[]; recoveredThisMonth: number }
-  revenue: {
-    /** CA réservé des RDV du jour (hors annulés / absents) */
-    bookedToday: number
-    /** opportunités ouvertes : ce que NOVIA peut encore récupérer */
-    toRecover: number
-    /** revenu du mois attribué à NOVIA (SmartFill + récupérations), réservé ou confirmé */
-    noviaThisMonth: number
-    month: RevenueReport['totals']
-  }
+  /** Indicateurs du panneau du jour. Définitions détaillées : src/domain/KPI.md */
+  revenue: CockpitRevenue
   takenOver: Customer[]
   feed: FeedItem[]
 }
@@ -113,22 +124,36 @@ export function buildCockpit(snap: NoviaSnapshot, now: Date, revenue: { all: Rev
     today,
     toConfirm: snap.appointments.filter((a) => isAwaitingValidation(a, now)).sort((a, b) => b.start.localeCompare(a.start)),
     freedSlots: snap.opportunities
-      .filter((o) => o.kind === 'smartfill' && o.status === 'open' && o.slotStart && new Date(o.slotStart).getTime() > now.getTime())
+      .filter(
+        (o) =>
+          o.kind === 'smartfill' &&
+          o.status === 'open' &&
+          !!o.slotStart &&
+          new Date(o.slotStart).getTime() > now.getTime() &&
+          // un créneau repris entre-temps n'est plus « libéré »
+          isSlotFree(new Date(o.slotStart), o.slotDurationMin ?? 60, snap.appointments),
+      )
       .sort((a, b) => a.slotStart!.localeCompare(b.slotStart!)),
     recoveries: {
       active: snap.runs.filter((r) => r.state === 'active').sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
       recoveredThisMonth: snap.runs.filter((r) => r.outcome === 'recovered' && r.endedAt && new Date(r.endedAt).getTime() >= monthStart).length,
     },
-    revenue: {
-      bookedToday: today
-        .filter((i) => isActiveBooking(i.appointment.status) || i.appointment.status === 'showed')
-        .reduce((s, i) => s + i.appointment.price, 0),
-      toRecover: revenue.all.totals.potential,
-      noviaThisMonth: noviaSources.reduce((s, k) => s + revenue.month.bySource[k].booked + revenue.month.bySource[k].confirmed, 0),
-      month: revenue.month.totals,
-    },
+    revenue: cockpitRevenue(today, revenue),
     takenOver: snap.customers.filter((c) => c.humanTakeover),
     feed: buildFeed(snap),
+  }
+}
+
+export function cockpitRevenue(today: TodayItem[], revenue: { all: RevenueReport; month: RevenueReport }): CockpitRevenue {
+  const level = (l: 'booked' | 'confirmed') =>
+    today.filter((i) => appointmentLevel(i.appointment) === l).reduce((s, i) => s + (l === 'confirmed' ? i.appointment.paymentProof!.amount : i.appointment.price), 0)
+  const m = revenue.month.bySource
+  return {
+    todayBooked: level('booked'),
+    todayConfirmed: level('confirmed'),
+    toRecover: revenue.all.totals.potential,
+    noviaWonThisMonth: noviaSources.reduce((s, k) => s + m[k].booked + m[k].confirmed, 0),
+    noviaConfirmedThisMonth: noviaSources.reduce((s, k) => s + m[k].confirmed, 0),
   }
 }
 

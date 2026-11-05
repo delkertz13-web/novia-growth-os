@@ -3,6 +3,7 @@
  * Les dates sont calculées par rapport au moment de la présentation pour que
  * « aujourd'hui » soit toujours rempli de façon cohérente.
  */
+import { business } from '../../config/business.demo'
 import { serviceById } from '../../config/services.demo'
 import type {
   Appointment,
@@ -29,7 +30,7 @@ export interface DemoState {
   voice: { active: boolean; mode: 'all' | 'missed' | 'after_hours' }
 }
 
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 const H = 3_600_000
 const D = 24 * H
@@ -47,6 +48,18 @@ const atDay = (base: Date, dayOffset: number, hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number)
   d.setHours(h, m, 0, 0)
   return d
+}
+
+/** k-ième jour d'ouverture après aujourd'hui (les RDV de la semaine tombent toujours un jour ouvert) */
+const atOpenDay = (base: Date, k: number, hhmm: string) => {
+  let offset = 0
+  for (let found = 0; found < k; ) {
+    offset++
+    const d = new Date(base)
+    d.setDate(d.getDate() + offset)
+    if (business.openingHours.value[d.getDay()]) found++
+  }
+  return atDay(base, offset, hhmm)
 }
 
 /** prochain vendredi (dans au moins 1 jour) */
@@ -144,10 +157,10 @@ export function createSeed(now = new Date()): DemoState {
   add('c07', 'depose-pose', roundHalfHour(n + 3.5 * H), 'booked', { attribution: 'acquisition', origin: 'voice' })
 
   /* ---------- Semaine à venir ---------- */
-  add('c06', 'remplissage', atDay(now, 1, '11:00'), 'confirmed')
-  add('c08', 'pose-gel', atDay(now, 2, '14:00'), 'booked', { attribution: 'acquisition' })
-  add('c09', 'remplissage', atDay(now, 3, '10:30'), 'booked')
-  add('c10', 'semi-permanent', atDay(now, 4, '17:00'), 'booked')
+  add('c06', 'remplissage', atOpenDay(now, 1, '11:00'), 'confirmed')
+  add('c08', 'pose-gel', atOpenDay(now, 2, '10:00'), 'booked', { attribution: 'acquisition' })
+  add('c09', 'remplissage', atOpenDay(now, 3, '10:30'), 'booked')
+  add('c10', 'semi-permanent', atOpenDay(now, 4, '14:00'), 'booked')
 
   /* ---------- Historique (prestations attestées) ---------- */
   add('c06', 'pose-gel', new Date(n - 12 * D), 'showed', { paid: true })
@@ -167,7 +180,7 @@ export function createSeed(now = new Date()): DemoState {
   /* ---------- No-shows du mois : 2, dont 1 récupéré ---------- */
   const ns1 = add('c12', 'remplissage', new Date(n - 10 * D), 'no_show')
   ns1.history.push({ at: new Date(n - 10 * D + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'cockpit' })
-  const rec = add('c12', 'remplissage', atDay(now, 3, '15:00'), 'booked', { attribution: 'noshow_recovery', origin: 'recovery' })
+  const rec = add('c12', 'remplissage', atOpenDay(now, 3, '12:00'), 'booked', { attribution: 'noshow_recovery', origin: 'recovery' })
   const ns2 = add('c13', 'semi-permanent', new Date(n - 6 * D), 'no_show')
   ns2.history.push({ at: new Date(n - 6 * D + 2 * H).toISOString(), from: 'confirmed', to: 'no_show', source: 'sms' })
 

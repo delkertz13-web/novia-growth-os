@@ -7,7 +7,7 @@ import { business } from '../../config/business.demo'
 import { rules } from '../../config/rules.demo'
 import { serviceById, services } from '../../config/services.demo'
 import { applyValidation, isActiveBooking } from '../../core/appointmentStatus'
-import { availableSlots, findDuplicate } from '../../core/availability'
+import { availableSlots, findDuplicate, isSlotFree } from '../../core/availability'
 import { computeRevenue } from '../../core/revenue'
 import { smartFillFunnel } from '../../core/smartfill'
 import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowRun } from '../../core/types'
@@ -175,6 +175,9 @@ export const MockBookingProvider: BookingProvider = {
   },
   listAppointments: () => getState().appointments,
   createBooking(input: BookingInput) {
+    const service = serviceById(input.serviceId)
+    if (!service) throw new Error('Prestation inconnue')
+    if (!isSlotFree(input.start, service.durationMin, getState().appointments)) throw new Error('Ce créneau vient d’être réservé. Choisissez-en un autre.')
     const isNew = !findDuplicate(getState().customers, input.contact)
     const customer = MockCRMProvider.upsertContact(input.contact, input.source)
     const attribution: AttributionSource = isNew ? (input.source === 'referral' ? 'referral' : 'acquisition') : 'direct'
@@ -373,6 +376,8 @@ export const engine = {
     const winner = funnel.contactable[0]
     const wl = getState().waitlist.find((w) => w.customerId === winner.id)
     const serviceId = wl?.serviceId ?? 'remplissage'
+    // le créneau a pu être repris entre-temps (réservation directe) : jamais de double réservation
+    if (!isSlotFree(new Date(o.slotStart), serviceById(serviceId)?.durationMin ?? o.slotDurationMin ?? 60, getState().appointments)) return null
     const a = insertAppointment(winner, serviceId, new Date(o.slotStart), 'smartfill', 'smartfill')
     setState((s) => ({
       ...s,

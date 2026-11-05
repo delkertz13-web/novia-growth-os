@@ -5,11 +5,11 @@ import { serviceById } from '../config/services.demo'
 import { appointmentEnd } from '../core/appointmentStatus'
 import { formatEUR } from '../core/revenue'
 import type { Appointment } from '../core/types'
-import { customerName, novia, sameDay, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
+import { customerName, kpiDefinitions, novia, sameDay, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
 import { Icon } from '../ui/Icon'
 import { Counter } from '../ui/motion/Counter'
 import { useReducedMotion } from '../ui/motion'
-import { capitalize, fmt, useDemoState, useNow } from '../ui/common'
+import { capitalize, fmt, Sheet, useDemoState, useNow } from '../ui/common'
 import { OutcomeButtons } from './parts'
 import { ReactionLinks, ReactionSteps } from './Reaction'
 import { useValidation } from './Validation'
@@ -45,6 +45,8 @@ export function Dashboard() {
   const byId = (id: string) => st.customers.find((c) => c.id === id)
   const pulse = usePulse(st)
   const runs = view.recoveries.active.length
+  const rev = view.revenue
+  const [how, setHow] = useState(false)
   const slots = view.freedSlots.length
 
   return (
@@ -71,33 +73,51 @@ export function Dashboard() {
 
       <section className="ck-panel" aria-label="Le salon aujourd’hui">
         <div className="ck-panel__main">
-          <span className="ck-label">CA réservé aujourd’hui</span>
+          <span className="ck-label">CA du jour</span>
           <span className="ck-big">
-            <Counter value={view.revenue.bookedToday} format={formatEUR} />
+            <Counter value={rev.todayBooked + rev.todayConfirmed} format={formatEUR} />
           </span>
-          <span className="ck-hint">pas encore encaissé</span>
+          <span className="ck-split">
+            <span>
+              <i className="lv lv--booked" aria-hidden="true" />
+              {formatEUR(rev.todayBooked)} réservé
+            </span>
+            <span>
+              <i className="lv lv--confirmed" aria-hidden="true" />
+              {formatEUR(rev.todayConfirmed)} confirmé
+            </span>
+          </span>
         </div>
         <div className="ck-panel__row">
           <Link to="/pro/revenue" className="ck-kpi ck-kpi--recover">
             <span className="ck-kpi__v">
-              <Counter value={view.revenue.toRecover} format={formatEUR} />
+              <Counter value={rev.toRecover} format={formatEUR} />
             </span>
             <span className="ck-kpi__l">à récupérer</span>
+            <span className="ck-kpi__lv">potentiel</span>
           </Link>
           <Link to="/pro/revenue" className="ck-kpi">
             <span className="ck-kpi__v">
-              <Counter value={view.revenue.noviaThisMonth} format={formatEUR} />
+              <Counter value={rev.noviaWonThisMonth} format={formatEUR} />
             </span>
-            <span className="ck-kpi__l">par NOVIA ce mois</span>
+            <span className="ck-kpi__l">gagné par NOVIA ce mois</span>
+            <span className="ck-kpi__lv">dont {formatEUR(rev.noviaConfirmedThisMonth)} confirmé</span>
           </Link>
           <Link to="/pro/novia" className="ck-kpi">
             <span className="ck-kpi__v">
               <Counter value={slots} />
             </span>
             <span className="ck-kpi__l">créneau{slots > 1 ? 'x' : ''} libéré{slots > 1 ? 's' : ''}</span>
+            <span className="ck-kpi__lv">SmartFill</span>
           </Link>
         </div>
+        <button type="button" className="ck-how" onClick={() => setHow(true)}>
+          <Icon name="info" size={15} /> Comment sont calculés ces chiffres ?
+        </button>
       </section>
+      <Sheet open={how} onClose={() => setHow(false)} label="Calcul des indicateurs">
+        <KpiHelp onClose={() => setHow(false)} />
+      </Sheet>
 
       <section className="p-section" aria-labelledby="ck-actions">
         <div className="p-section__head">
@@ -217,7 +237,7 @@ function ActionCard({
   const [played, setPlayed] = useState(false)
   const doneRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    if (played) doneRef.current?.focus({ preventScroll: true })
+    if (played) doneRef.current?.focus()
   }, [played])
 
   return (
@@ -344,6 +364,41 @@ function Feed({ items, now }: { items: FeedItem[]; now: Date }) {
           </li>
         ))}
       </ol>
+    </div>
+  )
+}
+
+/* ---------------- Définitions des indicateurs ---------------- */
+
+function KpiHelp({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="kpi-help">
+      <h2 className="display">Ces chiffres</h2>
+      <p className="kpi-help__levels">
+        <span>
+          <i className="lv lv--potential" /> Potentiel : peut encore être regagné.
+        </span>
+        <span>
+          <i className="lv lv--booked" /> Réservé : un rendez-vous existe, rien n’est encaissé.
+        </span>
+        <span>
+          <i className="lv lv--confirmed" /> Confirmé : prestation attestée et preuve de paiement.
+        </span>
+      </p>
+      <dl>
+        {kpiDefinitions.map((k) => (
+          <div key={k.id}>
+            <dt>
+              {k.label} <small>{k.level}</small>
+            </dt>
+            <dd>{k.rule}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="kpi-help__demo">Données de démonstration, entièrement fictives. Aucun montant n’est encaissé par NOVIA.</p>
+      <button className="btn btn--ghost btn--block" onClick={onClose}>
+        Fermer
+      </button>
     </div>
   )
 }

@@ -11,5 +11,6 @@ export const novia = createNovia(providers, { rules, services })
 
 export * from './cockpit'
 export * from './reactions'
+export * from './kpi'
 export type { IntentResult, Novia } from './intents'
 export type { NoviaSnapshot, SmartFillFunnel, VoiceMode, VoiceSettings } from '../providers/types'

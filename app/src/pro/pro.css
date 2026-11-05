@@ -9,8 +9,9 @@
   --paper: #1b1512;
   --shell: #2a221d;
   --ink: #f4efe9;
-  --ink-2: rgba(244, 239, 233, 0.84);
-  --muted: rgba(244, 239, 233, 0.56);
+  --ink-2: rgba(244, 239, 233, 0.9);
+  /* textes secondaires : contraste ≥ 7:1 sur les surfaces (WCAG AAA pour le corps) */
+  --muted: rgba(244, 239, 233, 0.7);
   --line: rgba(244, 239, 233, 0.08);
   --line-strong: rgba(244, 239, 233, 0.17);
   --lacquer: #8e3439;
@@ -28,8 +29,10 @@
   --elev-1: var(--shadow-1);
   --elev-2: var(--shadow-2);
 
+  --tabbar-h: 64px;
   min-height: calc(100dvh - var(--banner-h) - var(--safe-top));
-  padding-bottom: calc(96px + var(--safe-bottom));
+  /* la barre d'onglets est ancrée en bas : le contenu s'arrête toujours au-dessus */
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 28px);
   background:
     radial-gradient(120% 60% at 85% -10%, rgba(142, 52, 57, 0.2), transparent 60%),
     radial-gradient(90% 50% at -10% 30%, rgba(184, 154, 110, 0.07), transparent 60%),
@@ -41,6 +44,17 @@
 html:has(.pro),
 html:has(.pro) body {
   background: #110d0b;
+}
+/* un élément atteint au clavier ou par scrollIntoView n'est jamais caché sous la barre */
+html:has(.pro) {
+  scroll-padding-bottom: calc(var(--tabbar-h, 64px) + var(--safe-bottom) + 16px);
+}
+.pro .wrap {
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+}
+.pro .badge {
+  font-size: 11px;
 }
 
 /* composants qui supposaient un fond clair */
@@ -88,9 +102,33 @@ html:has(.pro) body {
   color: var(--ink);
 }
 .pro .tabbar {
-  background: rgba(27, 21, 18, 0.95);
-  border: 1px solid rgba(244, 239, 233, 0.08);
-  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+  /* ancrée, pleine largeur, opaque : elle ne recouvre jamais une carte ni un bouton */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: auto;
+  max-width: none;
+  justify-content: center;
+  gap: 4px;
+  min-height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding: 6px max(10px, env(safe-area-inset-right, 0px)) calc(6px + var(--safe-bottom)) max(10px, env(safe-area-inset-left, 0px));
+  border-radius: 0;
+  background: #120e0c;
+  border-top: 1px solid rgba(244, 239, 233, 0.09);
+  box-shadow: 0 -16px 32px -16px rgba(0, 0, 0, 0.9);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.pro .tabbar a {
+  flex: 1 1 0;
+  max-width: 120px;
+  min-height: 52px;
+  align-content: center;
+  border-radius: 16px;
+}
+.pro .toast {
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
 }
 .p-head {
   padding: 18px 0 6px;
@@ -150,7 +188,7 @@ html:has(.pro) body {
   border-radius: 99px;
   text-decoration: none;
   color: rgba(244, 239, 233, 0.62);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
   transition: background 0.25s, color 0.25s;
@@ -195,7 +233,7 @@ html:has(.pro) body {
   font-variation-settings: 'opsz' 96;
 }
 .stat__hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .stat--dark {
@@ -356,7 +394,7 @@ html:has(.pro) body {
 .appt__time small {
   display: block;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .appt__who {
@@ -433,7 +471,7 @@ html:has(.pro) body {
   gap: 12px;
 }
 .run__wf {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--lacquer);
@@ -504,7 +542,7 @@ html:has(.pro) body {
 }
 .steps__time {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .steps li.is-new {
@@ -652,7 +690,7 @@ html:has(.pro) body {
   font-variant-numeric: tabular-nums;
 }
 .level__def {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);
 }
 .level--potential {
@@ -679,7 +717,7 @@ html:has(.pro) body {
 }
 .src-table th {
   text-align: right;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -752,7 +790,7 @@ html:has(.pro) body {
 
 .run__sim {
   flex: 0 0 100%;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -921,7 +959,7 @@ html:has(.pro) body {
   border: 1px solid var(--line);
 }
 .cf__facts dt {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .cf__facts dd {
@@ -930,8 +968,11 @@ html:has(.pro) body {
   font-variant-numeric: tabular-nums;
 }
 
-a.appt__who {
-  text-decoration: none;
-  display: inline-block;
-  min-height: 24px;
+/* cibles tactiles ≥ 44 px dans tout l'espace Pro */
+.pro .link-arrow {
+  min-height: 44px;
+  align-items: center;
+}
+.pro .seg button {
+  min-height: 44px;
 }

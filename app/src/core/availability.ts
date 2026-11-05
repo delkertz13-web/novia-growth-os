@@ -35,6 +35,13 @@ export function availableSlots(
   return slots
 }
 
+/** Le créneau [start, start + durée[ ne chevauche aucun RDV qui occupe l'agenda. */
+export function isSlotFree(start: Date, durationMin: number, appointments: Appointment[], excludeId?: string): boolean {
+  const s = start.getTime()
+  const e = s + durationMin * 60_000
+  return !appointments.some((a) => a.id !== excludeId && occupies(a) && s < appointmentEnd(a).getTime() && e > new Date(a.start).getTime())
+}
+
 /* ------------------------------------------------------------------ */
 /* Déduplication des contacts (W01 : obligatoire)                       */
 /* ------------------------------------------------------------------ */

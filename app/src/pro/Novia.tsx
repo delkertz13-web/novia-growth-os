@@ -91,17 +91,15 @@ export function Novia() {
         </div>
         <div className="timeline">
           {refills.map(({ customer, last, daysSince, recommended }) => (
-            <div key={customer.id} className="appt" style={{ gridTemplateColumns: '1fr auto' }}>
+            <Link key={customer.id} to={`/pro/cliente/${customer.id}`} className="appt" style={{ gridTemplateColumns: '1fr auto' }}>
               <div style={{ minWidth: 0 }}>
-                <Link to={`/pro/cliente/${customer.id}`} className="appt__who">
-                  {customerName(customer)}
-                </Link>
+                <div className="appt__who">{customerName(customer)}</div>
                 <div className="appt__what">
                   {serviceById(last.serviceId)?.name} il y a {daysSince} jours · retour conseillé à {recommended} j (démo)
                 </div>
               </div>
               <span className="badge">{customer.optOut ? 'Opposition' : !customer.consent.marketing ? 'Sans consentement' : 'Contactable'}</span>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

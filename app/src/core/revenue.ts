@@ -81,15 +81,30 @@ export function computeRevenue(
     if (level === 'booked' && a.status === 'showed') awaitingProof += amount
   }
 
-  // Potentiel : uniquement les opportunités encore ouvertes (une opportunité gagnée
-  // est déjà comptée via son rendez-vous : pas de double compte).
-  for (const o of opportunities) {
-    if (o.status !== 'open' || !inPeriod(o.slotStart ?? o.createdAt)) continue
-    totals.potential += o.amount
-    bySource[opportunitySource[o.kind]].potential += o.amount
+  // Potentiel : le revenu d'un rendez-vous perdu (absence, annulation) qui n'a pas
+  // encore été regagné. Un même RDV perdu peut ouvrir deux opportunités (relancer la
+  // cliente ET proposer le créneau via SmartFill) : il n'est compté qu'UNE fois.
+  // Dès qu'une de ses opportunités est gagnée, il sort du potentiel (le revenu regagné
+  // est alors compté via le nouveau rendez-vous).
+  for (const group of groupBySource(opportunities)) {
+    if (group.some((o) => o.status === 'won')) continue
+    const open = group.filter((o) => o.status === 'open').sort((a, b) => Number(a.kind === 'smartfill') - Number(b.kind === 'smartfill'))[0]
+    if (!open || !inPeriod(open.slotStart ?? open.createdAt)) continue
+    totals.potential += open.amount
+    bySource[opportunitySource[open.kind]].potential += open.amount
   }
 
   return { totals, bySource, awaitingProof }
+}
+
+/** Opportunités regroupées par rendez-vous d'origine (une opportunité sans origine forme son propre groupe). */
+function groupBySource(opportunities: Opportunity[]): Opportunity[][] {
+  const groups = new Map<string, Opportunity[]>()
+  for (const o of opportunities) {
+    const key = o.sourceAppointmentId ?? `#${o.id}`
+    groups.set(key, [...(groups.get(key) ?? []), o])
+  }
+  return [...groups.values()]
 }
 
 export const formatEUR = (n: number) =>
