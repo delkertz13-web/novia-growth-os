@@ -12,6 +12,7 @@ import { Home } from './client/Home'
 import { Infos, Services } from './client/Services'
 import { Agenda } from './pro/Agenda'
 import { AppointmentDetail } from './pro/AppointmentDetail'
+import { CustomerFile } from './pro/CustomerFile'
 import { Dashboard } from './pro/Dashboard'
 import { Novia } from './pro/Novia'
 import { ProLayout } from './pro/ProLayout'
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
           { index: true, element: <Dashboard /> },
           { path: 'agenda', element: <Agenda /> },
           { path: 'rdv/:id', element: <AppointmentDetail /> },
+          { path: 'cliente/:id', element: <CustomerFile /> },
           { path: 'novia', element: <Novia /> },
           { path: 'revenue', element: <Revenue /> },
         ],

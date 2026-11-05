@@ -4,7 +4,7 @@ import { serviceById, services } from '../config/services.demo'
 import { formatEUR } from '../core/revenue'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, Customer, Opportunity } from '../core/types'
-import { engine } from '../providers/mock'
+import { novia, type SmartFillFunnel, type VoiceMode } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
 import { customerName, RunCard, StatTile } from './parts'
@@ -93,7 +93,9 @@ export function Novia() {
           {refills.map(({ customer, last, daysSince, recommended }) => (
             <div key={customer.id} className="appt" style={{ gridTemplateColumns: '1fr auto' }}>
               <div style={{ minWidth: 0 }}>
-                <div className="appt__who">{customerName(customer)}</div>
+                <Link to={`/pro/cliente/${customer.id}`} className="appt__who">
+                  {customerName(customer)}
+                </Link>
                 <div className="appt__what">
                   {serviceById(last.serviceId)?.name} il y a {daysSince} jours · retour conseillé à {recommended} j (démo)
                 </div>
@@ -103,6 +105,8 @@ export function Novia() {
           ))}
         </div>
       </section>
+
+      <VoiceSection />
 
       <SmartFillSheet key={sfId ?? 'none'} id={sfId} onClose={() => setParams({}, { replace: true })} opportunity={slots.find((o) => o.id === sfId)} />
     </main>
@@ -138,9 +142,8 @@ function SlotCard({ o, result, customers, onLaunch }: { o: Opportunity; result?:
 }
 
 function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; opportunity?: Opportunity; onClose: () => void }) {
-  type Funnel = NonNullable<ReturnType<typeof engine.smartFillFunnel>>
   const [phase, setPhase] = useState<'intro' | 'running' | 'done'>('intro')
-  const [snapshot, setSnapshot] = useState<Funnel | null>(null)
+  const [snapshot, setSnapshot] = useState<SmartFillFunnel | null>(null)
   const [winner, setWinner] = useState<Customer | null>(null)
   const close = () => {
     setPhase('intro')
@@ -153,11 +156,11 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
 
   const launch = () => {
     // photo de l'entonnoir AVANT la réservation simulée
-    setSnapshot(engine.smartFillFunnel(o.id))
+    setSnapshot(novia.pro.previewSmartFill(o.id))
     setPhase('running')
     setTimeout(() => {
-      const r = engine.smartFillBook(o.id)
-      if (r) setWinner(r.customer)
+      const r = novia.pro.launchSmartFill(o.id)
+      if (r.ok && r.value) setWinner(r.value.customer)
       setPhase('done')
     }, 1600)
   }
@@ -182,7 +185,17 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
             absence d’opposition et de reprise humaine. La première qui réserve récupère le créneau.
           </p>
           <button className="btn btn--lacquer btn--block" onClick={launch}>
-            <Icon name="bolt" size={18} /> Lancer la simulation
+            <Icon name="bolt" size={18} /> Lancer SmartFill
+          </button>
+          <button
+            className="btn btn--ghost btn--block"
+            style={{ marginTop: 8 }}
+            onClick={() => {
+              novia.pro.keepSlotFree(o.id)
+              close()
+            }}
+          >
+            Garder ce créneau libre
           </button>
         </>
       )}
@@ -228,5 +241,44 @@ function FunnelRow({ n, total, label }: { n: number; total: number; label: strin
       <span className="funnel__num">{n}</span>
       <span className="funnel__label">{label}</span>
     </div>
+  )
+}
+
+const voiceModes: { id: VoiceMode; label: string; hint: string }[] = [
+  { id: 'missed', label: 'Appels manqués', hint: 'NOVIA répond quand vous ne pouvez pas décrocher.' },
+  { id: 'after_hours', label: 'Hors horaires', hint: 'NOVIA répond quand le salon est fermé.' },
+  { id: 'all', label: 'Tous les appels', hint: 'NOVIA répond à chaque appel.' },
+]
+
+/** Configurer NOVIA Voice : intention métier, sans aucun appel réel en démo. */
+function VoiceSection() {
+  const st = useDemoState()
+  const v = st.voice
+  const mode = voiceModes.find((m) => m.id === v.mode) ?? voiceModes[0]
+  return (
+    <section className="p-section">
+      <div className="p-section__head">
+        <h2 className="p-section__title">
+          <Icon name="phone" size={20} /> NOVIA Voice
+        </h2>
+        <SimBadge label="Aucun appel réel" />
+      </div>
+      <article className="card voice">
+        <label className="voice__switch">
+          <span>
+            <strong>{v.active ? 'NOVIA répond au téléphone' : 'NOVIA Voice est en pause'}</strong>
+            <span className="muted">{v.active ? mode.hint : 'Les appels sonnent normalement.'}</span>
+          </span>
+          <input type="checkbox" role="switch" checked={v.active} onChange={(e) => novia.pro.configureVoice({ active: e.target.checked })} />
+        </label>
+        <div className="seg" role="radiogroup" aria-label="Quand NOVIA répond" aria-disabled={!v.active || undefined}>
+          {voiceModes.map((m) => (
+            <button key={m.id} role="radio" aria-checked={v.mode === m.id} className={v.mode === m.id ? 'is-active' : ''} disabled={!v.active} onClick={() => novia.pro.configureVoice({ mode: m.id })}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </article>
+    </section>
   )
 }

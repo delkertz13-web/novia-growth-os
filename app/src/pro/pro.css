@@ -1,7 +1,96 @@
+/*
+ * Espace Pro · V2 : l'atelier de nuit. Les mêmes composants, mais tous les jetons de
+ * couleur sont redéfinis sur .pro : le cockpit vit dans le monde sombre de l'accueil
+ * et de la galerie, avec des surfaces légèrement plus claires que le fond.
+ */
 .pro {
+  color-scheme: dark;
+  --porcelain: #110d0b;
+  --paper: #1b1512;
+  --shell: #2a221d;
+  --ink: #f4efe9;
+  --ink-2: rgba(244, 239, 233, 0.84);
+  --muted: rgba(244, 239, 233, 0.56);
+  --line: rgba(244, 239, 233, 0.08);
+  --line-strong: rgba(244, 239, 233, 0.17);
+  --lacquer: #8e3439;
+  --lacquer-soft: rgba(176, 72, 78, 0.18);
+  --sage: #9cc3a2;
+  --sage-soft: rgba(156, 195, 162, 0.13);
+  --ochre: #e0b265;
+  --ochre-soft: rgba(224, 178, 101, 0.13);
+  --brick: #ec8a7d;
+  --brick-soft: rgba(236, 138, 125, 0.14);
+  --slate: #b2bfcd;
+  --slate-soft: rgba(178, 191, 205, 0.12);
+  --shadow-1: 0 1px 0 rgba(244, 239, 233, 0.03) inset, 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+  --shadow-2: 0 1px 0 rgba(244, 239, 233, 0.05) inset, 0 24px 48px -20px rgba(0, 0, 0, 0.85);
+  --elev-1: var(--shadow-1);
+  --elev-2: var(--shadow-2);
+
   min-height: calc(100dvh - var(--banner-h) - var(--safe-top));
   padding-bottom: calc(96px + var(--safe-bottom));
-  background: var(--porcelain);
+  background:
+    radial-gradient(120% 60% at 85% -10%, rgba(142, 52, 57, 0.2), transparent 60%),
+    radial-gradient(90% 50% at -10% 30%, rgba(184, 154, 110, 0.07), transparent 60%),
+    var(--porcelain);
+  background-attachment: fixed;
+  color: var(--ink);
+}
+/* le rebond de défilement iOS montre la même nuit, pas la porcelaine */
+html:has(.pro),
+html:has(.pro) body {
+  background: #110d0b;
+}
+
+/* composants qui supposaient un fond clair */
+.pro .stat--dark,
+.pro .novia-card--dark,
+.pro .level--confirmed {
+  background: linear-gradient(150deg, #3a1b1d, #221513 70%);
+  color: var(--ink);
+  border-color: rgba(236, 138, 125, 0.16);
+}
+.pro .notice {
+  color: var(--ochre);
+}
+.pro .src-table .zero {
+  color: rgba(244, 239, 233, 0.22);
+}
+.pro .funnel__bar {
+  background: rgba(244, 239, 233, 0.12);
+}
+.pro .funnel__row:nth-child(2) .funnel__bar {
+  background: rgba(224, 178, 101, 0.22);
+}
+.pro .funnel__row:nth-child(3) .funnel__bar {
+  background: rgba(176, 72, 78, 0.5);
+}
+.pro .outcome.is-current {
+  background: var(--shell);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.pro .sheet-backdrop {
+  background: rgba(5, 3, 2, 0.6);
+}
+.pro .sheet {
+  background: #1d1714;
+  box-shadow: 0 -1px 0 rgba(244, 239, 233, 0.08);
+}
+.pro .btn--light {
+  background: var(--ink);
+  color: #16110f;
+}
+.btn--glass {
+  background: rgba(244, 239, 233, 0.08);
+  border-color: rgba(244, 239, 233, 0.14);
+  color: var(--ink);
+}
+.pro .tabbar {
+  background: rgba(27, 21, 18, 0.95);
+  border: 1px solid rgba(244, 239, 233, 0.08);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
 }
 .p-head {
   padding: 18px 0 6px;
@@ -651,4 +740,198 @@
   animation: rise 0.4s var(--ease);
   max-width: calc(100% - 32px);
   text-align: center;
+}
+
+.pro .day.is-selected {
+  background: linear-gradient(160deg, #4a2224, #2b1718);
+  border-color: rgba(236, 138, 125, 0.3);
+  color: var(--ink);
+}
+
+/* ---------------- Simulation (démo) dans une séquence ---------------- */
+
+.run__sim {
+  flex: 0 0 100%;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ochre);
+}
+.run__takeover {
+  justify-self: start;
+}
+
+/* ---------------- Fiche rendez-vous : lien vers la cliente ---------------- */
+
+.detail-hero__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 18px;
+  text-decoration: none;
+  min-height: 44px;
+}
+
+/* ---------------- NOVIA Voice ---------------- */
+
+.voice {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+.voice__switch {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+.voice__switch > span {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.voice__switch strong {
+  font-size: 15px;
+}
+.voice__switch input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 32px;
+  border-radius: 99px;
+  background: var(--shell);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out);
+}
+.voice__switch input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+.voice__switch input:checked {
+  background: var(--lacquer);
+}
+.voice__switch input:checked::after {
+  transform: translateX(20px);
+}
+.voice .seg {
+  display: flex;
+}
+.voice .seg button {
+  flex: 1;
+  min-height: 40px;
+  padding: 7px 8px;
+}
+.voice .seg button:disabled {
+  opacity: 0.4;
+}
+
+/* ---------------- Fiche cliente ---------------- */
+
+.cf {
+  display: grid;
+  gap: 16px;
+  padding-top: 14px;
+}
+.cf__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cf__head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.cf__head h1 {
+  font-size: clamp(28px, 8vw, 40px);
+  margin: 0 0 2px;
+}
+.cf__head .muted {
+  font-size: 13px;
+}
+.cf__avatar {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  background: linear-gradient(150deg, #3a1b1d, #221513);
+  border: 1px solid rgba(236, 138, 125, 0.18);
+}
+.cf__novia {
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+.cf__novia-state {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.cf__novia-state > div {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.cf__novia-state strong {
+  font-size: 15px;
+}
+.cf__novia-dot {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 4px var(--sage-soft);
+  transition: background var(--dur-2), box-shadow var(--dur-2);
+}
+.cf__novia.is-human .cf__novia-dot {
+  background: var(--ochre);
+  box-shadow: 0 0 0 4px var(--ochre-soft);
+}
+.cf__novia .btn {
+  justify-self: start;
+}
+.cf__facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cf__facts div {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.cf__facts dt {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.cf__facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+a.appt__who {
+  text-decoration: none;
+  display: inline-block;
+  min-height: 24px;
 }

@@ -5,7 +5,7 @@ import { galleryById } from '../config/content.demo'
 import { serviceById } from '../config/services.demo'
 import type { Appointment } from '../core/types'
 import { resolveMedia } from '../media/media'
-import { providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Photo, useDemoState } from '../ui/common'
 import { prefersReducedMotion } from '../ui/motion'
@@ -53,7 +53,7 @@ export function Booking() {
   const doneTitle = useRef<HTMLHeadingElement>(null)
 
   const service = serviceId ? serviceById(serviceId) : undefined
-  const services = providers.booking.listServices()
+  const services = novia.client.services()
   const phase: Phase = done ? 'done' : sending ? 'confirming' : 'edit'
 
   const days = useMemo(() => {
@@ -63,14 +63,14 @@ export function Booking() {
     for (let i = 0; i < 21; i++) {
       const d = new Date(base)
       d.setDate(base.getDate() + i)
-      out.push({ date: d, count: serviceId ? providers.booking.getSlots(d, serviceId).length : 0 })
+      out.push({ date: d, count: serviceId ? novia.client.availableSlots(d, serviceId).length : 0 })
     }
     return out
     // `step` : recalcul en revenant sur l'étape (l'agenda a pu changer)
   }, [serviceId, step])
 
   const selectedDay = day ?? (slot ? new Date(new Date(slot).setHours(0, 0, 0, 0)) : null) ?? days.find((d) => d.count > 0)?.date ?? null
-  const slots = selectedDay && serviceId ? providers.booking.getSlots(selectedDay, serviceId) : []
+  const slots = selectedDay && serviceId ? novia.client.availableSlots(selectedDay, serviceId) : []
   const grouped = slots.reduce<Record<string, Date[]>>((acc, s) => {
     ;(acc[period(s)] ??= []).push(s)
     return acc
@@ -101,7 +101,7 @@ export function Booking() {
   const confirm = () => {
     if (!service || !slot || sending || done) return
     const create = () => {
-      const a = providers.booking.createBooking({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
+      const a = novia.client.book({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
       setBookedAt(new Date())
       setDone(a)
     }

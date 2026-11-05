@@ -1,6 +1,7 @@
 /**
- * Implémentations MOCK des six providers + moteur de démonstration NOVIA.
+ * Implémentations MOCK des providers NOVIA + contrôles de démonstration.
  * Rien n'est envoyé, appelé ni encaissé : tout est simulé localement.
+ * L'interface utilisateur n'importe jamais ce fichier : elle passe par src/domain.
  */
 import { business } from '../../config/business.demo'
 import { rules } from '../../config/rules.demo'
@@ -21,16 +22,19 @@ import {
 } from '../../core/workflows'
 import type {
   AnalyticsProvider,
+  AutomationProvider,
   BookingInput,
   BookingProvider,
   CRMProvider,
+  DemoControls,
   MessagingProvider,
   PaymentProvider,
   Providers,
   SimulatedMessage,
+  SyncProvider,
   VoiceProvider,
 } from '../types'
-import { getState, nextId, setState } from './store'
+import { getState, nextId, resetDemo, setState, subscribe } from './store'
 
 const now = () => new Date()
 const upsert = <T extends { id: string }>(list: T[], item: T) =>
@@ -82,10 +86,19 @@ export const MockCRMProvider: CRMProvider = {
     return c
   },
   setHumanTakeover(customerId, value) {
-    setState((s) => ({
-      ...s,
-      customers: s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c)),
-    }))
+    const t = now()
+    setState((s) => {
+      const customers = s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c))
+      if (!value) return { ...s, customers }
+      // reprise humaine : les séquences en cours s'arrêtent au contrôle suivant, ici immédiatement
+      const customer = customers.find((c) => c.id === customerId)!
+      const runs = s.runs.map((r) =>
+        r.customerId === customerId && r.state === 'active'
+          ? advanceRecovery(r, { customer, appointments: s.appointments, runs: s.runs, now: t, rules, sourceAppointment: s.appointments.find((a) => a.id === r.appointmentId) })
+          : r,
+      )
+      return { ...s, customers, runs }
+    })
   },
 }
 
@@ -268,13 +281,12 @@ export const MockAnalyticsProvider: AnalyticsProvider = {
   getRevenue: (period) => computeRevenue(getState().appointments, getState().opportunities, period),
 }
 
-export const providers: Providers = {
-  booking: MockBookingProvider,
-  crm: MockCRMProvider,
-  messaging: MockMessagingProvider,
-  voice: MockVoiceProvider,
-  payment: MockPaymentProvider,
-  analytics: MockAnalyticsProvider,
+export const MockSyncProvider: SyncProvider = {
+  getSnapshot: () => getState(),
+  subscribe: (l) => {
+    const off = subscribe(l)
+    return () => void off()
+  },
 }
 
 /* ------------------------------------------------------------------ */
@@ -380,6 +392,36 @@ function firstAvailableSlot(serviceId: string): Date | undefined {
     if (slots.length) return slots[Math.min(2, slots.length - 1)]
   }
   return undefined
+}
+
+export const MockAutomationProvider: AutomationProvider = {
+  previewSmartFill: (id) => engine.smartFillFunnel(id),
+  launchSmartFill: (id) => engine.smartFillBook(id),
+  closeSmartFill(id) {
+    setState((s) => ({
+      ...s,
+      opportunities: s.opportunities.map((o) => (o.id === id && o.kind === 'smartfill' && o.status === 'open' ? { ...o, status: 'lost' } : o)),
+    }))
+  },
+}
+
+export const MockDemoControls: DemoControls = {
+  advanceRecovery: (id) => engine.advance(id),
+  clientDeclines: (id) => engine.decline(id),
+  clientRebooks: (id) => engine.clientRebooks(id),
+  reset: resetDemo,
+}
+
+export const providers: Providers = {
+  sync: MockSyncProvider,
+  automation: MockAutomationProvider,
+  demo: MockDemoControls,
+  booking: MockBookingProvider,
+  crm: MockCRMProvider,
+  messaging: MockMessagingProvider,
+  voice: MockVoiceProvider,
+  payment: MockPaymentProvider,
+  analytics: MockAnalyticsProvider,
 }
 
 export const activeBookingsCount = () => getState().appointments.filter((a) => isActiveBooking(a.status)).length

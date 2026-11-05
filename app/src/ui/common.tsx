@@ -2,12 +2,13 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 import { Link, useLocation } from 'react-router-dom'
 import { attendanceState, statusLabels } from '../core/appointmentStatus'
 import type { Appointment } from '../core/types'
-import { getState, resetDemo, subscribe } from '../providers/mock/store'
+import { novia } from '../domain'
 import { Icon } from './Icon'
 
 /* ---------------- Hooks ---------------- */
 
-export const useDemoState = () => useSyncExternalStore(subscribe, getState)
+/** Instantané métier courant, relu à chaque changement (via le domaine NOVIA). */
+export const useDemoState = () => useSyncExternalStore(novia.subscribe, novia.snapshot)
 
 /** Horloge partagée : les états « à confirmer » évoluent avec l'heure réelle. */
 export function useNow(intervalMs = 30_000) {
@@ -42,7 +43,7 @@ export function DemoBanner() {
   const { pathname } = useLocation()
   const isPro = pathname.startsWith('/pro')
   const onReset = () => {
-    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) resetDemo()
+    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) novia.demo?.reset()
   }
   return (
     <div className="demo-banner" role="note" aria-label="Démonstration NOVIA — données fictives">

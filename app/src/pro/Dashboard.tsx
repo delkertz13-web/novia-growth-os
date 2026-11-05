@@ -1,37 +1,57 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { business } from '../config/business.demo'
-import { serviceById, services } from '../config/services.demo'
-import { appointmentEnd, isActiveBooking, isAwaitingValidation } from '../core/appointmentStatus'
-import { appointmentLevel, formatEUR } from '../core/revenue'
-import { refillsDue } from '../core/smartfill'
-import { providers } from '../providers/mock'
+import { serviceById } from '../config/services.demo'
+import { appointmentEnd } from '../core/appointmentStatus'
+import { formatEUR } from '../core/revenue'
+import type { Appointment } from '../core/types'
+import { customerName, novia, sameDay, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, sameDay, SimBadge, useDemoState, useNow } from '../ui/common'
-import { AppointmentRow, customerName, OutcomeButtons, StatTile } from './parts'
+import { Counter } from '../ui/motion/Counter'
+import { useReducedMotion } from '../ui/motion'
+import { capitalize, fmt, useDemoState, useNow } from '../ui/common'
+import { OutcomeButtons } from './parts'
+import { ReactionLinks, ReactionSteps } from './Reaction'
 import { useValidation } from './Validation'
+import './cockpit.css'
 
+/**
+ * Cockpit NOVIA Pro. Lit une vue construite par le domaine (novia.pro.cockpit) et
+ * n'agit que par des intentions métier. Quand la professionnelle déclare un statut,
+ * la carte reste en place et montre NOVIA réagir, étape par étape, pendant que les
+ * compteurs du haut se mettent à jour.
+ */
 export function Dashboard() {
   const st = useDemoState()
   const now = useNow()
-  const { pick, ui } = useValidation()
-  const byId = (id: string) => st.customers.find((c) => c.id === id)
+  const view = useMemo(() => novia.pro.cockpit(now), [st, now])
+  const reduce = useReducedMotion()
 
-  const today = st.appointments
-    .filter((a) => sameDay(new Date(a.start), now) && a.status !== 'rescheduled')
-    .sort((a, b) => a.start.localeCompare(b.start))
-  const pending = st.appointments.filter((a) => isAwaitingValidation(a, now)).sort((a, b) => b.start.localeCompare(a.start))
-  const upcoming = today.filter((a) => isActiveBooking(a.status) && appointmentEnd(a).getTime() > now.getTime())
-  const bookedToday = today.filter((a) => appointmentLevel(a) === 'booked').reduce((s, a) => s + a.price, 0)
-  const freeSlots = st.opportunities.filter((o) => o.kind === 'smartfill' && o.status === 'open')
-  const activeRuns = st.runs.filter((r) => r.state === 'active')
-  const refills = refillsDue(st.customers, st.appointments, services, now)
-  const revenue = providers.analytics.getRevenue()
+  // Réactions en cours d'affichage : la carte reste visible après la décision.
+  const [held, setHeld] = useState<{ before: Appointment; reaction: Reaction; leaving?: boolean }[]>([])
+  const onReaction = useCallback((reaction: Reaction, before: Appointment) => setHeld((h) => [...h.filter((x) => x.before.id !== before.id), { before, reaction }]), [])
+  const { pick, ui } = useValidation(onReaction)
+  const dismiss = (id: string) => {
+    if (reduce) return setHeld((h) => h.filter((x) => x.before.id !== id))
+    setHeld((h) => h.map((x) => (x.before.id === id ? { ...x, leaving: true } : x)))
+    window.setTimeout(() => setHeld((h) => h.filter((x) => x.before.id !== id)), 420)
+  }
+
+  const actions = [
+    ...view.toConfirm.filter((a) => !held.some((h) => h.before.id === a.id)).map((a) => ({ a, h: undefined })),
+    ...held.map((h) => ({ a: h.before, h })),
+  ].sort((x, y) => y.a.start.localeCompare(x.a.start))
+
+  const byId = (id: string) => st.customers.find((c) => c.id === id)
+  const pulse = usePulse(st)
+  const runs = view.recoveries.active.length
+  const slots = view.freedSlots.length
 
   return (
-    <main className="wrap page">
-      <header className="p-head">
+    <main className="wrap page ck">
+      <header className="ck-head">
         <div>
-          <div className="p-head__date">{capitalize(fmt.dayLong(now))}</div>
+          <div className="ck-head__date">{capitalize(fmt.dayLong(now))}</div>
           <h1 className="display">Bonjour {business.artistFirstName.value}</h1>
         </div>
         <div className="avatar" aria-hidden="true">
@@ -39,126 +59,291 @@ export function Dashboard() {
         </div>
       </header>
 
-      <div className="stats stagger">
-        <StatTile label="RDV aujourd’hui" value={today.filter((a) => a.status !== 'cancelled').length} to="/pro/agenda" />
-        <StatTile label="CA réservé du jour" value={formatEUR(bookedToday)} hint="pas encore encaissé" variant="dark" />
-        <StatTile label="Créneaux libérés" value={freeSlots.length} hint="à remplir" to="/pro/novia" />
-        <StatTile label="Actions nécessaires" value={pending.length} hint="présences à confirmer" variant={pending.length ? 'alert' : undefined} />
-      </div>
+      <p className="ck-pulse" aria-live="polite">
+        <span className="ck-pulse__dot" key={pulse} aria-hidden="true" />
+        <span>
+          NOVIA veille
+          {runs > 0 && ` · ${runs} récupération${runs > 1 ? 's' : ''} en cours`}
+          {slots > 0 && ` · ${slots} créneau${slots > 1 ? 'x' : ''} à remplir`}
+        </span>
+        <span className="ck-pulse__demo">Démo</span>
+      </p>
 
-      <section className="p-section">
+      <section className="ck-panel" aria-label="Le salon aujourd’hui">
+        <div className="ck-panel__main">
+          <span className="ck-label">CA réservé aujourd’hui</span>
+          <span className="ck-big">
+            <Counter value={view.revenue.bookedToday} format={formatEUR} />
+          </span>
+          <span className="ck-hint">pas encore encaissé</span>
+        </div>
+        <div className="ck-panel__row">
+          <Link to="/pro/revenue" className="ck-kpi ck-kpi--recover">
+            <span className="ck-kpi__v">
+              <Counter value={view.revenue.toRecover} format={formatEUR} />
+            </span>
+            <span className="ck-kpi__l">à récupérer</span>
+          </Link>
+          <Link to="/pro/revenue" className="ck-kpi">
+            <span className="ck-kpi__v">
+              <Counter value={view.revenue.noviaThisMonth} format={formatEUR} />
+            </span>
+            <span className="ck-kpi__l">par NOVIA ce mois</span>
+          </Link>
+          <Link to="/pro/novia" className="ck-kpi">
+            <span className="ck-kpi__v">
+              <Counter value={slots} />
+            </span>
+            <span className="ck-kpi__l">créneau{slots > 1 ? 'x' : ''} libéré{slots > 1 ? 's' : ''}</span>
+          </Link>
+        </div>
+      </section>
+
+      <section className="p-section" aria-labelledby="ck-actions">
         <div className="p-section__head">
-          <h2 className="p-section__title">
-            À confirmer {pending.length > 0 && <span className="count">{pending.length}</span>}
+          <h2 className="p-section__title" id="ck-actions">
+            Actions nécessaires {view.toConfirm.length > 0 && <span className="count">{view.toConfirm.length}</span>}
           </h2>
         </div>
-        {pending.length === 0 ? (
-          <div className="card" style={{ padding: 18, fontSize: 14 }}>
-            Tout est à jour. Les rendez-vous terminés apparaîtront ici : NOVIA ne déduit jamais une présence de l’heure.
+        {actions.length === 0 ? (
+          <div className="ck-calm">
+            <Icon name="check" size={16} /> Tout est à jour. NOVIA ne déduit jamais une présence de l’heure : les rendez-vous terminés apparaîtront ici.
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: 10 }}>
-            {pending.map((a) => {
-              const c = byId(a.customerId)
-              return (
-                <article key={a.id} className="card validate">
-                  <Link to={`/pro/rdv/${a.id}`} className="validate__top">
-                    <div className="validate__time">{fmt.time(a.start)}</div>
-                    <div style={{ flex: 1 }}>
-                      <div className="validate__who">{customerName(c)}</div>
-                      <div className="validate__what">
-                        {serviceById(a.serviceId)?.name} · {fmt.eur(a.price)}
-                      </div>
-                    </div>
-                    <Icon name="chevronRight" size={18} />
-                  </Link>
-                  <div className="validate__q">Le rendez-vous est terminé. Était-elle présente ?</div>
-                  <OutcomeButtons a={a} now={now} onPick={(o) => pick(a, o)} />
-                </article>
-              )
-            })}
+          <div className="ck-actions">
+            {actions.map(({ a, h }) => (
+              <ActionCard
+                key={a.id}
+                a={a}
+                customerName={customerName(byId(a.customerId))}
+                now={now}
+                reaction={h?.reaction}
+                leaving={h?.leaving}
+                onPick={(o) => pick(a, o)}
+                onDone={() => dismiss(a.id)}
+              />
+            ))}
           </div>
         )}
       </section>
 
-      <section className="p-section">
+      <section className="p-section" aria-labelledby="ck-today">
         <div className="p-section__head">
-          <h2 className="p-section__title">Prochains rendez-vous</h2>
+          <h2 className="p-section__title" id="ck-today">
+            Aujourd’hui
+          </h2>
           <Link to="/pro/agenda" className="link-arrow">
             Agenda <Icon name="arrowRight" size={16} />
           </Link>
         </div>
-        <div className="timeline">
-          {upcoming.length === 0 && <div className="muted" style={{ fontSize: 14 }}>Plus de rendez-vous aujourd’hui.</div>}
-          {upcoming.map((a) => (
-            <AppointmentRow key={a.id} a={a} customer={byId(a.customerId)} now={now} />
-          ))}
-        </div>
+        <TodayRail items={view.today} now={now} />
       </section>
 
-      <section className="p-section">
+      <section className="p-section" aria-labelledby="ck-novia">
         <div className="p-section__head">
-          <h2 className="p-section__title">NOVIA en action</h2>
-          <SimBadge />
+          <h2 className="p-section__title" id="ck-novia">
+            NOVIA en action
+          </h2>
+          <span className="badge badge--sim">Simulation</span>
         </div>
-        <div className="grid-2">
-          {freeSlots.slice(0, 1).map((o) => (
-            <Link key={o.id} to={`/pro/novia?smartfill=${o.id}`} className="card novia-card novia-card--dark">
-              <div className="novia-card__row">
-                <span className="eyebrow" style={{ color: 'rgba(244,239,233,.6)' }}>
-                  Créneau libre
-                </span>
-                <Icon name="bolt" size={18} />
-              </div>
-              <div className="novia-card__title">
-                {capitalize(fmt.dayShort(o.slotStart!))} · {fmt.time(o.slotStart!)}
-              </div>
-              <div className="muted" style={{ fontSize: 13 }}>
-                {o.slotDurationMin} min · {formatEUR(o.amount)} à récupérer
-              </div>
-              <span className="btn btn--light btn--sm" style={{ justifySelf: 'start' }}>
-                Lancer SmartFill
+        <div className="ck-novia">
+          {view.freedSlots.slice(0, 1).map((o) => (
+            <Link key={o.id} to={`/pro/novia?smartfill=${o.id}`} className="ck-slot">
+              <span className="ck-label">
+                <Icon name="bolt" size={14} /> Créneau libéré
               </span>
+              <span className="ck-slot__when">
+                {capitalize(fmt.dayShort(o.slotStart!))} · {fmt.time(o.slotStart!)}
+              </span>
+              <span className="ck-hint">
+                {o.slotDurationMin} min · {formatEUR(o.amount)} à récupérer
+              </span>
+              <span className="btn btn--lacquer btn--sm">Lancer SmartFill</span>
             </Link>
           ))}
-          <Link to="/pro/novia" className="card novia-card">
-            <div className="novia-card__row">
-              <span className="eyebrow">Récupérations en cours</span>
-              <Icon name="refresh" size={18} />
-            </div>
-            <div className="novia-card__title">
-              {activeRuns.length} séquence{activeRuns.length > 1 ? 's' : ''} W03 / W04
-            </div>
-            <div className="muted" style={{ fontSize: 13 }}>
-              {refills.length} remplissage{refills.length > 1 ? 's' : ''} à prévoir
-            </div>
+          <Link to="/pro/novia" className="ck-tile">
+            <span className="ck-label">
+              <Icon name="refresh" size={14} /> Récupérations
+            </span>
+            <span className="ck-tile__v">
+              <Counter value={runs} />
+            </span>
+            <span className="ck-hint">
+              en cours · {view.recoveries.recoveredThisMonth} réussie{view.recoveries.recoveredThisMonth > 1 ? 's' : ''} ce mois
+            </span>
           </Link>
-          <Link to="/pro/revenue" className="card novia-card">
-            <div className="novia-card__row">
-              <span className="eyebrow">Revenue · tout l’historique démo</span>
-              <Icon name="chart" size={18} />
-            </div>
-            <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13 }}>
-              <span>
-                <b style={{ fontSize: 17 }}>{formatEUR(revenue.totals.potential)}</b>
-                <br />
-                <span className="muted">potentiel</span>
-              </span>
-              <span>
-                <b style={{ fontSize: 17 }}>{formatEUR(revenue.totals.booked)}</b>
-                <br />
-                <span className="muted">réservé</span>
-              </span>
-              <span>
-                <b style={{ fontSize: 17 }}>{formatEUR(revenue.totals.confirmed)}</b>
-                <br />
-                <span className="muted">confirmé</span>
-              </span>
-            </div>
-          </Link>
+          <Feed items={view.feed} now={now} />
         </div>
       </section>
       {ui}
     </main>
+  )
+}
+
+/** Change de valeur à chaque changement d'état métier : le point du pouls clignote une fois. */
+function usePulse(st: unknown) {
+  const [n, setN] = useState(0)
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    setN((x) => x + 1)
+  }, [st])
+  return n
+}
+
+/* ---------------- Carte d'action ---------------- */
+
+function ActionCard({
+  a,
+  customerName: who,
+  now,
+  reaction,
+  leaving,
+  onPick,
+  onDone,
+}: {
+  a: Appointment
+  customerName: string
+  now: Date
+  reaction?: Reaction
+  leaving?: boolean
+  onPick: Parameters<typeof OutcomeButtons>[0]['onPick']
+  onDone: () => void
+}) {
+  const s = serviceById(a.serviceId)
+  const [played, setPlayed] = useState(false)
+  const doneRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (played) doneRef.current?.focus({ preventScroll: true })
+  }, [played])
+
+  return (
+    <div className={`ck-collapse ${leaving ? 'is-leaving' : ''}`}>
+      <article className={`ck-card ${reaction ? `is-reacting is-${reaction.outcome}` : ''}`}>
+        <Link to={`/pro/rdv/${a.id}`} className="ck-card__top">
+          <span className="ck-card__time">{fmt.time(a.start)}</span>
+          <span className="ck-card__who">
+            <strong>{who}</strong>
+            <span>
+              {s?.name} · {fmt.eur(a.price)}
+            </span>
+          </span>
+          {reaction ? (
+            <span className={`ck-state ck-state--${reaction.outcome}`} key={reaction.outcome}>
+              {reaction.stateLabel}
+            </span>
+          ) : (
+            <span className="ck-state ck-state--unknown">À confirmer</span>
+          )}
+        </Link>
+
+        {reaction ? (
+          <div className="ck-card__rx">
+            <ReactionSteps reaction={reaction} onPlayed={() => setPlayed(true)} />
+            <div className={`ck-card__after ${played ? 'is-on' : ''}`}>
+              <ReactionLinks reaction={reaction} />
+              <button ref={doneRef} type="button" className="btn btn--ghost btn--sm" onClick={onDone}>
+                OK
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="ck-card__q">
+              Terminé à {fmt.time(appointmentEnd(a))}
+              {!sameDay(new Date(a.start), now) ? ` le ${fmt.dayShort(a.start)}` : ''}. Était-elle là ?
+            </p>
+            <OutcomeButtons a={a} now={now} onPick={onPick} />
+          </>
+        )}
+      </article>
+    </div>
+  )
+}
+
+/* ---------------- Journée ---------------- */
+
+const stateText: Record<TodayState, string> = {
+  done: 'Présente',
+  absent: 'Absente',
+  cancelled: 'Annulée',
+  to_confirm: 'À confirmer',
+  in_progress: 'En cours',
+  next: 'Prochaine',
+  upcoming: '',
+}
+
+function TodayRail({ items, now }: { items: TodayItem[]; now: Date }) {
+  if (!items.length) return <div className="ck-calm">Aucun rendez-vous aujourd’hui.</div>
+  const nowIdx = items.findIndex((i) => new Date(i.appointment.start).getTime() > now.getTime())
+  return (
+    <ol className="ck-rail">
+      {items.map((i, idx) => (
+        <li key={i.appointment.id} className={`ck-rail__item is-${i.state}`}>
+          {idx === nowIdx && (
+            <div className="ck-now" aria-label={`Maintenant, ${fmt.time(now)}`}>
+              <span>{fmt.time(now)}</span>
+            </div>
+          )}
+          <Link to={`/pro/rdv/${i.appointment.id}`} className="ck-rail__row">
+            <span className="ck-rail__time">{fmt.time(i.appointment.start)}</span>
+            <span className="ck-rail__dot" aria-hidden="true" />
+            <span className="ck-rail__who">
+              <strong>{customerName(i.customer)}</strong>
+              <span>
+                {serviceById(i.appointment.serviceId)?.name} · {fmt.eur(i.appointment.price)}
+              </span>
+            </span>
+            {stateText[i.state] && (
+              <span className={`ck-state ck-state--${i.state}`} key={i.state}>
+                {stateText[i.state]}
+              </span>
+            )}
+          </Link>
+        </li>
+      ))}
+      {nowIdx === -1 && (
+        <li className="ck-rail__item">
+          <div className="ck-now" aria-label={`Maintenant, ${fmt.time(now)}`}>
+            <span>{fmt.time(now)}</span>
+          </div>
+        </li>
+      )}
+    </ol>
+  )
+}
+
+/* ---------------- Activité ---------------- */
+
+const ago = (iso: string, now: Date) => {
+  const m = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000)
+  if (m < 1) return 'à l’instant'
+  if (m < 60) return `il y a ${m} min`
+  const h = Math.round(m / 60)
+  if (h < 24) return `il y a ${h} h`
+  return capitalize(fmt.dayShort(iso))
+}
+
+function Feed({ items, now }: { items: FeedItem[]; now: Date }) {
+  if (!items.length) return null
+  return (
+    <div className="ck-feed">
+      <span className="ck-label">Dernières actions de NOVIA</span>
+      <ol>
+        {items.slice(0, 4).map((f) => (
+          <li key={f.id} className={`ck-feed__item k-${f.kind}`}>
+            <span className="ck-feed__dot" aria-hidden="true" />
+            <span className="ck-feed__text">
+              {f.who && <strong>{f.who} · </strong>}
+              {f.label}
+            </span>
+            <span className="ck-feed__at">{ago(f.at, now)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   )
 }

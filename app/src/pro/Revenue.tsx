@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatEUR, levelLabels, sourceLabels, type RevenueLevel } from '../core/revenue'
 import type { AttributionSource } from '../core/types'
-import { providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Notice, useDemoState, useNow } from '../ui/common'
 
 const defs: Record<RevenueLevel, string> = {
@@ -18,7 +18,7 @@ export function Revenue() {
   const [period, setPeriod] = useState<'month' | 'all'>('month')
   const from = new Date(now.getFullYear(), now.getMonth(), 1)
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  const r = providers.analytics.getRevenue(period === 'month' ? { from, to } : undefined)
+  const r = novia.pro.revenueAttribution(period === 'month' ? { from, to } : undefined)
   const levels: RevenueLevel[] = ['potential', 'booked', 'confirmed']
   const cell = (n: number) => <td className={n ? '' : 'zero'}>{n ? formatEUR(n) : '—'}</td>
 

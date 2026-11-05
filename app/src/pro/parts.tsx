@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { serviceById } from '../config/services.demo'
 import { appointmentEnd, attendanceState, outcomeLabels } from '../core/appointmentStatus'
 import type { Appointment, Customer, ValidationOutcome, WorkflowRun } from '../core/types'
-import { engine, providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Sheet, SimBadge, StatusPill } from '../ui/common'
 
@@ -87,7 +87,7 @@ export function ReschedulePicker({
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     d.setDate(d.getDate() + i + 1)
-    return { d, slots: providers.booking.getSlots(d, a.serviceId) }
+    return { d, slots: novia.pro.availableSlots(d, a.serviceId) }
   }).filter((x) => x.slots.length)
   const current = days[Math.min(dayIdx, days.length - 1)]
   return (
@@ -163,23 +163,33 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
         ))}
       </ol>
       {run.state === 'active' ? (
-        <div className="run__actions">
-          <button className="btn btn--primary btn--sm" onClick={() => engine.advance(run.id)}>
-            <Icon name="play" size={14} /> Avancer le scénario
-          </button>
-          <button
-            className="btn btn--ghost btn--sm"
-            onClick={() => {
-              const a = engine.clientRebooks(run.id)
-              if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
-            }}
-          >
-            La cliente réserve
-          </button>
-          <button className="btn btn--ghost btn--sm" onClick={() => engine.decline(run.id)}>
-            Refus
-          </button>
-        </div>
+        <>
+          {novia.demo && (
+            <div className="run__actions" role="group" aria-label="Simuler la suite (démo)">
+              <span className="run__sim">Simuler</span>
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.advanceRecovery(run.id)}>
+                <Icon name="play" size={14} /> Le temps passe
+              </button>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  const a = novia.demo?.clientRebooks(run.id)
+                  if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
+                }}
+              >
+                Elle réserve
+              </button>
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.clientDeclines(run.id)}>
+                Elle refuse
+              </button>
+            </div>
+          )}
+          {customer && (
+            <button className="btn btn--ghost btn--sm run__takeover" onClick={() => novia.pro.takeOverConversation(customer.id)}>
+              <Icon name="message" size={14} /> Reprendre la conversation
+            </button>
+          )}
+        </>
       ) : (
         <div className={`run__result ${run.outcome === 'recovered' ? '' : 'run__result--neutral'}`}>
           {outcomeText[run.outcome ?? 'stopped']}

@@ -4,7 +4,7 @@ import { business } from '../config/business.demo'
 import { services } from '../config/services.demo'
 import { heroSlots, mediaUrl, resolveMedia } from '../media/media'
 import type { MediaAsset } from '../media/types'
-import { providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Photo } from '../ui/common'
 import { prefersReducedMotion } from '../ui/motion'
@@ -20,7 +20,7 @@ function nextFreeSlot(): Date | undefined {
   for (let i = 0; i < 14; i++) {
     const d = new Date(day)
     d.setDate(day.getDate() + i)
-    const slot = providers.booking.getSlots(d, shortest.id)[0]
+    const slot = novia.client.availableSlots(d, shortest.id)[0]
     if (slot) return slot
   }
   return undefined
