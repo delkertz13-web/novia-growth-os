@@ -1,5 +1,6 @@
 import type { WorkflowRules } from '../config/schema'
 import { isActiveBooking } from './appointmentStatus'
+import { optOutReason } from './optout'
 import type { Appointment, Customer, WorkflowAction, WorkflowId, WorkflowRun } from './types'
 
 /* ------------------------------------------------------------------ */
@@ -79,25 +80,25 @@ export function evaluateGuards(ctx: GuardContext): GuardDecision {
 
   // État du RDV d'origine encore valable ?
   if (workflow === 'W04' && sourceAppointment && sourceAppointment.status !== 'no_show') {
-    return { kind: 'stop', reason: 'Le statut n’est plus « Absente » : la récupération est obsolète.' }
+    return { kind: 'stop', reason: 'Le rendez-vous n’est plus marqué « Absente » : plus rien à récupérer.' }
   }
   if (workflow === 'W03' && sourceAppointment && sourceAppointment.status !== 'cancelled') {
-    return { kind: 'stop', reason: 'Le rendez-vous n’est plus annulé : la récupération est obsolète.' }
+    return { kind: 'stop', reason: 'Le rendez-vous n’est plus annulé : plus rien à récupérer.' }
   }
 
   // Nouveau RDV déjà réservé → retour W02
   if (hasFutureBooking(appointments, customer.id, now)) {
-    return { kind: 'stop', reason: 'Un nouveau rendez-vous existe déjà.', transition: 'W02' }
+    return { kind: 'stop', reason: 'La cliente a déjà un nouveau rendez-vous.', transition: 'W02' }
   }
 
   // W01 : déjà cliente
   if (workflow === 'W01' && customer.lifecycle === 'client') {
-    return { kind: 'stop', reason: 'Contact déjà cliente : sortie de W01.' }
+    return { kind: 'stop', reason: 'Elle est déjà cliente.' }
   }
 
-  if (customer.optOut) return { kind: 'stop', reason: 'Opposition / STOP enregistrée.' }
-  if (!customer.consent.transactional) return { kind: 'stop', reason: 'Contact non joignable (pas de consentement).' }
-  if (customer.humanTakeover) return { kind: 'stop', reason: 'La professionnelle a repris la conversation.' }
+  if (customer.optOut) return { kind: 'stop', reason: optOutReason }
+  if (!customer.consent.transactional) return { kind: 'stop', reason: 'Pas de consentement pour lui écrire.' }
+  if (customer.humanTakeover) return { kind: 'stop', reason: 'Vous avez repris la conversation.' }
 
   const blocking = runs.find(
     (r) =>
@@ -107,11 +108,11 @@ export function evaluateGuards(ctx: GuardContext): GuardDecision {
       incompatible[workflow].includes(r.workflow),
   )
   if (blocking) {
-    return { kind: 'wait', reason: `Workflow ${blocking.workflow} incompatible en cours.`, until: now }
+    return { kind: 'wait', reason: 'Un autre suivi NOVIA est déjà en cours pour elle.', until: now }
   }
 
   if (!isWithinSendWindow(now, rules.sendWindow)) {
-    return { kind: 'wait', reason: 'Hors plage d’envoi autorisée.', until: nextSendWindowStart(now, rules.sendWindow) }
+    return { kind: 'wait', reason: 'En dehors de vos horaires d’envoi : NOVIA attend.', until: nextSendWindowStart(now, rules.sendWindow) }
   }
   return { kind: 'send' }
 }
@@ -133,8 +134,11 @@ export function reminderTimes(a: Appointment, rules: WorkflowRules, now: Date): 
 /* W03 / W04 — séquence de récupération                                 */
 /* ------------------------------------------------------------------ */
 
-let seq = 0
-const runId = (wf: WorkflowId) => `run-${wf}-${Date.now().toString(36)}-${(seq++).toString(36)}`
+/**
+ * Identifiant déterministe : une séquence par RDV et par validation (l'historique du
+ * statut grandit à chaque validation, une correction ouvre donc un nouvel identifiant).
+ */
+const runId = (wf: WorkflowId, source: Appointment) => `run-${wf}-${source.id}-${source.history.length}`
 
 const act = (now: Date, kind: WorkflowAction['kind'], label: string): WorkflowAction => ({
   at: now.toISOString(),
@@ -147,6 +151,8 @@ export function startRecovery(
   source: Appointment,
   rules: WorkflowRules,
   now: Date,
+  /** si la cliente a répondu STOP, la récupération sortante ne démarre pas */
+  customer?: Pick<Customer, 'optOut'>,
 ): WorkflowRun {
   if (workflow === 'W04' && source.status !== 'no_show') {
     throw new Error('W04 ne démarre que sur une absence confirmée.')
@@ -155,8 +161,8 @@ export function startRecovery(
     throw new Error('W03 ne démarre que sur une annulation confirmée.')
   }
   const wait = workflow === 'W03' ? rules.w03.waitBeforeRecoveryHours : rules.w04.waitBeforeRecoveryHours
-  return {
-    id: runId(workflow),
+  const run: WorkflowRun = {
+    id: runId(workflow, source),
     workflow,
     customerId: source.customerId,
     appointmentId: source.id,
@@ -165,10 +171,12 @@ export function startRecovery(
     messagesSent: 0,
     startedAt: now.toISOString(),
     actions: [
-      act(now, 'info', workflow === 'W03' ? 'Annulation confirmée : rappels W02 stoppés.' : 'Absence confirmée par la professionnelle.'),
-      act(now, 'info', `Attente avant récupération : ${wait} h (paramètre démo).`),
+      act(now, 'info', workflow === 'W03' ? 'Annulation confirmée : les rappels sont arrêtés.' : 'Absence confirmée par vous.'),
+      act(now, 'info', `NOVIA attend ${wait} h avant d’écrire.`),
     ],
   }
+  if (!customer?.optOut) return run
+  return { ...run, state: 'stopped', step: 'done', endedAt: now.toISOString(), outcome: 'stopped', actions: [run.actions[0], act(now, 'stop', optOutReason)] }
 }
 
 const stopRun = (run: WorkflowRun, now: Date, reason: string, outcome: string): WorkflowRun => ({
@@ -191,13 +199,13 @@ export function advanceRecovery(run: WorkflowRun, ctx: Omit<GuardContext, 'workf
 
   if (guard.kind === 'stop') {
     const recovered = guard.transition === 'W02'
-    return stopRun(run, now, `STOP — ${guard.reason}${recovered ? ' → W02' : ''}`, recovered ? 'recovered' : 'stopped')
+    return stopRun(run, now, `NOVIA s’arrête : ${guard.reason}`, recovered ? 'recovered' : 'stopped')
   }
   if (guard.kind === 'wait') {
-    return { ...run, actions: [...run.actions, act(now, 'blocked', `En attente — ${guard.reason}`)] }
+    return { ...run, actions: [...run.actions, act(now, 'blocked', `En attente : ${guard.reason}`)] }
   }
 
-  const label = run.workflow === 'W04' ? 'non culpabilisant' : 'proposant une nouvelle réservation'
+  const label = run.workflow === 'W04' ? 'bienveillant, sans reproche, avec un nouveau créneau' : 'proposant de reprendre rendez-vous'
   switch (run.step) {
     case 'wait':
     case 'recheck':
@@ -207,8 +215,8 @@ export function advanceRecovery(run: WorkflowRun, ctx: Omit<GuardContext, 'workf
         messagesSent: run.messagesSent + 1,
         actions: [
           ...run.actions,
-          act(now, 'check_ok', 'Revérification : statut, nouveau RDV, opposition, reprise humaine — OK.'),
-          act(now, 'message_simulated', `Message de récupération ${label} (simulé, aucun envoi).`),
+          act(now, 'check_ok', 'Vérification avant envoi : situation inchangée, pas de nouveau RDV, pas d’opposition.'),
+          act(now, 'message_simulated', `Message ${label} (simulé, aucun envoi).`),
         ],
       }
     case 'await_reply':
@@ -218,24 +226,61 @@ export function advanceRecovery(run: WorkflowRun, ctx: Omit<GuardContext, 'workf
         messagesSent: run.messagesSent + 1,
         actions: [
           ...run.actions,
-          act(now, 'check_ok', 'Aucune réponse. Revérification — OK.'),
-          act(now, 'message_simulated', 'Dernière relance (simulée).'),
+          act(now, 'check_ok', 'Pas de réponse. Nouvelle vérification avant envoi : OK.'),
+          act(now, 'message_simulated', 'Dernière relance, toujours bienveillante (simulée).'),
         ],
       }
     case 'await_final':
-      return stopRun(run, now, 'Aucune réponse après la dernière relance : STOP.', 'no_response')
+      return stopRun(run, now, 'Pas de réponse après la dernière relance : NOVIA s’arrête.', 'no_response')
     default:
       return run
   }
 }
 
 /** La cliente refuse : STOP immédiat. */
+const open = (run: WorkflowRun) => run.state === 'active' || run.state === 'paused'
+
 export const declineRecovery = (run: WorkflowRun, now: Date) =>
-  run.state === 'active' ? stopRun(run, now, 'Refus de la cliente : STOP.', 'declined') : run
+  open(run) ? stopRun(run, now, 'La cliente ne souhaite pas reprendre rendez-vous : NOVIA s’arrête.', 'declined') : run
 
 /** La cliente réserve : STOP et retour W02. */
 export const markRecovered = (run: WorkflowRun, now: Date) =>
-  run.state === 'active' ? stopRun(run, now, 'Nouveau rendez-vous réservé : STOP → W02.', 'recovered') : run
+  open(run) ? stopRun(run, now, 'Nouveau rendez-vous réservé : récupération réussie.', 'recovered') : run
+
+/** Reprise humaine : la séquence se met en pause (aucun envoi), sans perdre son étape. */
+export const pauseRun = (run: WorkflowRun, now: Date): WorkflowRun =>
+  run.state === 'active'
+    ? { ...run, state: 'paused', actions: [...run.actions, act(now, 'blocked', 'En pause : vous avez repris la conversation.')] }
+    : run
+
+/** La professionnelle rend la main : la séquence reprend, et revérifie tout avant le prochain envoi. */
+export const resumeRun = (run: WorkflowRun, now: Date): WorkflowRun =>
+  run.state === 'paused'
+    ? { ...run, state: 'active', actions: [...run.actions, act(now, 'info', 'Vous avez rendu la main à NOVIA.')] }
+    : run
+
+/**
+ * Rendre à NOVIA : la séquence en pause est relue contre l'état ACTUEL avant de reprendre
+ * (statut du RDV d'origine, nouveau RDV, opposition, consentement). Si la situation est
+ * devenue incompatible, elle s'arrête au lieu de reprendre. Aucun message n'est envoyé ici.
+ */
+export function resumeAfterRecheck(run: WorkflowRun, ctx: Omit<GuardContext, 'workflow' | 'runId'>): WorkflowRun {
+  if (run.state !== 'paused') return run
+  const { now } = ctx
+  const guard = evaluateGuards({ ...ctx, workflow: run.workflow, runId: run.id })
+  if (guard.kind === 'stop') {
+    const recovered = guard.transition === 'W02'
+    return stopRun(run, now, `Vérification au retour : ${guard.reason} NOVIA ne reprend pas.`, recovered ? 'recovered' : 'stopped')
+  }
+  const resumed = resumeRun(run, now)
+  return {
+    ...resumed,
+    actions: [
+      ...resumed.actions,
+      act(now, guard.kind === 'send' ? 'check_ok' : 'blocked', guard.kind === 'send' ? 'Vérification au retour : situation inchangée, consentement et pas d’opposition. NOVIA reprend.' : `Vérification au retour : situation inchangée. ${guard.reason}`),
+    ],
+  }
+}
 
 /**
  * Correction de statut : l'état actuel écrase l'ancien,
@@ -243,11 +288,11 @@ export const markRecovered = (run: WorkflowRun, now: Date) =>
  */
 export function stopObsoleteRuns(runs: WorkflowRun[], appointment: Appointment, now: Date): WorkflowRun[] {
   return runs.map((r) => {
-    if (r.state !== 'active' || r.appointmentId !== appointment.id) return r
+    if (!open(r) || r.appointmentId !== appointment.id) return r
     const stillValid =
       (r.workflow === 'W04' && appointment.status === 'no_show') ||
       (r.workflow === 'W03' && appointment.status === 'cancelled')
-    return stillValid ? r : stopRun(r, now, 'Statut corrigé : séquence devenue obsolète, STOP.', 'obsolete')
+    return stillValid ? r : stopRun(r, now, 'Statut corrigé : plus rien à récupérer, NOVIA s’arrête.', 'obsolete')
   })
 }
 

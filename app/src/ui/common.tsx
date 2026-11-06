@@ -1,19 +1,24 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { attendanceState, statusLabels } from '../core/appointmentStatus'
 import type { Appointment } from '../core/types'
-import { getState, resetDemo, subscribe } from '../providers/mock/store'
+import { novia } from '../domain'
 import { Icon } from './Icon'
 
 /* ---------------- Hooks ---------------- */
 
-export const useDemoState = () => useSyncExternalStore(subscribe, getState)
+/** Instantané métier courant, relu à chaque changement (via le domaine NOVIA). */
+export const useDemoState = () => useSyncExternalStore(novia.subscribe, novia.snapshot)
 
-/** Horloge partagée : les états « à confirmer » évoluent avec l'heure réelle. */
+/**
+ * « Maintenant » selon l'horloge NOVIA. En démo, l'heure de référence ne bouge pas :
+ * aucun minuteur. Avec une horloge système, relue toutes les 30 s.
+ */
 export function useNow(intervalMs = 30_000) {
-  const [now, setNow] = useState(() => new Date())
+  const [now, setNow] = useState(() => novia.now())
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), intervalMs)
+    if (novia.clockMode === 'demo') return
+    const t = setInterval(() => setNow(novia.now()), intervalMs)
     return () => clearInterval(t)
   }, [intervalMs])
   return now
@@ -36,34 +41,9 @@ export const sameDay = (a: Date, b: Date) =>
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-/* ---------------- Bandeau démo ---------------- */
+/* ---------------- Bandeau démo : voir ./demo.tsx ---------------- */
 
-export function DemoBanner() {
-  const { pathname } = useLocation()
-  const isPro = pathname.startsWith('/pro')
-  const onReset = () => {
-    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) resetDemo()
-  }
-  return (
-    <div className="demo-banner" role="note" aria-label="Démonstration NOVIA — données fictives">
-      <div className="wrap demo-banner__row">
-        <span className="demo-banner__tag">DÉMO</span>
-        <span className="demo-banner__text">Démonstration NOVIA — données fictives</span>
-        <nav className="demo-banner__switch" aria-label="Changer d’espace">
-          <Link to="/" viewTransition className={!isPro ? 'is-active' : ''}>
-            Cliente
-          </Link>
-          <Link to="/pro" viewTransition className={isPro ? 'is-active' : ''}>
-            Pro
-          </Link>
-        </nav>
-        <button className="demo-banner__reset" onClick={onReset} aria-label="Réinitialiser la démo" title="Réinitialiser la démo">
-          <Icon name="refresh" size={16} />
-        </button>
-      </div>
-    </div>
-  )
-}
+export { DemoBanner } from './demo'
 
 /* ---------------- Badges ---------------- */
 

@@ -3,26 +3,32 @@ import { Link } from 'react-router-dom'
 import { serviceById } from '../config/services.demo'
 import { appointmentEnd, attendanceState, outcomeLabels } from '../core/appointmentStatus'
 import type { Appointment, Customer, ValidationOutcome, WorkflowRun } from '../core/types'
-import { engine, providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Sheet, SimBadge, StatusPill } from '../ui/common'
+import { capitalize, fmt, Sheet, StatusPill } from '../ui/common'
 
 export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : '—')
 
 /* ---------------- Ligne de rendez-vous ---------------- */
 
-export function AppointmentRow({ a, customer, now }: { a: Appointment; customer?: Customer; now: Date }) {
+/** origine visible dans l'agenda quand NOVIA a obtenu le rendez-vous */
+const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'Créneau rempli', recovery: 'Récupérée' }
+
+export function AppointmentRow({ a, customer, now, highlight }: { a: Appointment; customer?: Customer; now: Date; highlight?: boolean }) {
   const s = serviceById(a.serviceId)
   const past = appointmentEnd(a).getTime() < now.getTime() && attendanceState(a, now) !== 'unknown'
   return (
-    <Link to={`/pro/rdv/${a.id}`} className={`appt ${past ? 'is-past' : ''}`}>
+    <Link to={`/pro/rdv/${a.id}`} className={`appt ${past ? 'is-past' : ''} ${highlight ? 'is-highlight' : ''}`}>
       <div className="appt__time">
         {fmt.time(a.start)}
         <small>{fmt.duration(a.durationMin)}</small>
       </div>
       <div style={{ minWidth: 0 }}>
         <div className="appt__who">{customerName(customer)}</div>
-        <div className="appt__what">{s?.name}</div>
+        <div className="appt__what">
+          {s?.name}
+          {originTag[a.bookingOrigin] && <span className={`origin-tag origin-tag--${a.bookingOrigin}`}>{originTag[a.bookingOrigin]}</span>}
+        </div>
       </div>
       <div className="appt__right">
         <span className="appt__price">{fmt.eur(a.price)}</span>
@@ -84,10 +90,10 @@ export function ReschedulePicker({
 }) {
   const [dayIdx, setDayIdx] = useState(0)
   const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date()
+    const d = novia.now()
     d.setHours(0, 0, 0, 0)
     d.setDate(d.getDate() + i + 1)
-    return { d, slots: providers.booking.getSlots(d, a.serviceId) }
+    return { d, slots: novia.pro.availableSlots(d, a.serviceId) }
   }).filter((x) => x.slots.length)
   const current = days[Math.min(dayIdx, days.length - 1)]
   return (
@@ -121,16 +127,16 @@ export function ReschedulePicker({
 /* ---------------- Séquence W03 / W04 ---------------- */
 
 const wfTitles: Record<string, string> = {
-  W03: 'Annulation → récupération',
-  W04: 'No-show → récupération',
+  W03: 'NOVIA récupère une annulation',
+  W04: 'NOVIA récupère une absence',
 }
 
 const outcomeText: Record<string, string> = {
-  recovered: 'Récupérée : nouveau rendez-vous réservé (→ W02).',
-  no_response: 'Aucune réponse : séquence terminée.',
-  declined: 'Refus de la cliente : séquence terminée.',
-  obsolete: 'Statut corrigé : séquence devenue obsolète.',
-  stopped: 'Séquence stoppée par un contrôle.',
+  recovered: 'Récupérée : elle a repris rendez-vous.',
+  no_response: 'Pas de réponse : NOVIA s’est arrêtée.',
+  declined: 'Elle ne souhaite pas reprendre rendez-vous : NOVIA s’est arrêtée.',
+  obsolete: 'Statut corrigé : plus rien à récupérer.',
+  stopped: 'NOVIA s’est arrêtée après vérification.',
 }
 
 export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; customer?: Customer; compact?: boolean }) {
@@ -144,12 +150,11 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
     <article className="card run">
       <div className="run__head">
         <div>
-          <div className="run__wf">{run.workflow}</div>
+          <div className={`run__wf run__wf--${run.state}`}>{run.state === 'active' ? 'En cours' : run.state === 'paused' ? 'En pause' : run.outcome === 'recovered' ? 'Réussie' : 'Terminée'}</div>
           <div className="run__title">
             {wfTitles[run.workflow] ?? run.workflow} · {customerName(customer)}
           </div>
         </div>
-        <SimBadge />
       </div>
       <ol className="steps">
         {actions.map((x, i) => (
@@ -163,22 +168,43 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
         ))}
       </ol>
       {run.state === 'active' ? (
-        <div className="run__actions">
-          <button className="btn btn--primary btn--sm" onClick={() => engine.advance(run.id)}>
-            <Icon name="play" size={14} /> Avancer le scénario
-          </button>
-          <button
-            className="btn btn--ghost btn--sm"
-            onClick={() => {
-              const a = engine.clientRebooks(run.id)
-              if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
-            }}
-          >
-            La cliente réserve
-          </button>
-          <button className="btn btn--ghost btn--sm" onClick={() => engine.decline(run.id)}>
-            Refus
-          </button>
+        <>
+          {novia.demo && (
+            <div className="run__actions" role="group" aria-label="Simuler la suite (démo)">
+              <span className="run__sim">Simuler</span>
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.advanceRecovery(run.id)}>
+                <Icon name="play" size={14} /> Le temps passe
+              </button>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  const a = novia.demo?.clientRebooks(run.id)
+                  if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
+                }}
+              >
+                Elle réserve
+              </button>
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.clientDeclines(run.id)}>
+                Elle refuse
+              </button>
+            </div>
+          )}
+          {customer && (
+            <button className="btn btn--ghost btn--sm run__takeover" onClick={() => novia.pro.takeOverConversation(customer.id)}>
+              <Icon name="message" size={14} /> Reprendre la conversation
+            </button>
+          )}
+        </>
+      ) : run.state === 'paused' ? (
+        <div className="run__paused">
+          <span>
+            <Icon name="pause" size={14} /> En pause : vous avez repris la conversation. Aucun message n’est envoyé.
+          </span>
+          {customer && (
+            <button className="btn btn--primary btn--sm" onClick={() => novia.pro.letNoviaHandle(customer.id)}>
+              <Icon name="sparkle" size={14} /> Rendre à NOVIA
+            </button>
+          )}
         </div>
       ) : (
         <div className={`run__result ${run.outcome === 'recovered' ? '' : 'run__result--neutral'}`}>

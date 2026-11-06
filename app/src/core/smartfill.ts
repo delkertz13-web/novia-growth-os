@@ -1,6 +1,7 @@
 import type { ServiceConfig } from '../config/schema'
 import { hasFutureBooking } from './workflows'
 import { isActiveBooking } from './appointmentStatus'
+import { mayInitiateOutbound } from './optout'
 import type { Appointment, Customer, WaitlistEntry } from './types'
 
 /** RDV à venir, ou passé mais pas encore validé : la cliente n'est pas à solliciter. */
@@ -43,7 +44,7 @@ export function smartFillFunnel(input: {
     return due <= slotStart.getTime()
   })
 
-  const contactable = eligible.filter((c) => !c.optOut && c.consent.marketing && !c.humanTakeover)
+  const contactable = eligible.filter(mayInitiateOutbound)
   return { eligible, contactable }
 }
 

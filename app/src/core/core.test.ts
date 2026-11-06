@@ -257,6 +257,17 @@ describe('Revenu : trois niveaux, jamais de double compte', () => {
     expect(r.bySource.noshow_recovery.potential).toBe(45)
   })
 
+  it('un RDV annulé ouvrant relance + SmartFill ne compte qu’une fois en potentiel', () => {
+    const cx: Opportunity = { id: 'o1', kind: 'cancellation_recovery', amount: 45, status: 'open', createdAt: NOW.toISOString(), sourceAppointmentId: 'a9' }
+    const sf: Opportunity = { id: 'o2', kind: 'smartfill', amount: 45, status: 'open', createdAt: NOW.toISOString(), sourceAppointmentId: 'a9' }
+    const r = computeRevenue([], [cx, sf])
+    expect(r.totals.potential).toBe(45)
+    expect(r.bySource.cancellation_recovery.potential).toBe(45)
+    expect(r.bySource.smartfill.potential).toBe(0)
+    // le créneau est rempli par SmartFill : le RDV perdu est regagné, il sort du potentiel
+    expect(computeRevenue([], [cx, { ...sf, status: 'won' }]).totals.potential).toBe(0)
+  })
+
   it('absence et annulation ne produisent aucun revenu', () => {
     expect(computeRevenue([appt({ status: 'no_show' }), appt({ status: 'cancelled' })], []).totals).toEqual({
       potential: 0,

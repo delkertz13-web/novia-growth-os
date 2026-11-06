@@ -1,16 +1,18 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Icon } from '../ui/Icon'
 import { formatEUR, levelLabels, sourceLabels, type RevenueLevel } from '../core/revenue'
 import type { AttributionSource } from '../core/types'
-import { providers } from '../providers/mock'
+import { novia } from '../domain'
 import { Notice, useDemoState, useNow } from '../ui/common'
 
 const defs: Record<RevenueLevel, string> = {
-  potential: 'Opportunités ouvertes : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
+  potential: 'Ce que NOVIA peut encore regagner : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
   booked: 'Rendez-vous réservés, ou prestations attestées sans preuve de paiement. Pas encore encaissé.',
   confirmed: 'Prestation attestée ET preuve de paiement (fictive dans la démo).',
 }
 
-const shown: AttributionSource[] = ['acquisition', 'cancellation_recovery', 'noshow_recovery', 'reactivation', 'referral', 'smartfill']
+const shown: AttributionSource[] = ['acquisition', 'cancellation_recovery', 'noshow_recovery', 'reactivation', 'referral', 'smartfill', 'voice']
 
 export function Revenue() {
   useDemoState()
@@ -18,15 +20,18 @@ export function Revenue() {
   const [period, setPeriod] = useState<'month' | 'all'>('month')
   const from = new Date(now.getFullYear(), now.getMonth(), 1)
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  const r = providers.analytics.getRevenue(period === 'month' ? { from, to } : undefined)
+  const r = novia.pro.revenueAttribution(period === 'month' ? { from, to } : undefined)
   const levels: RevenueLevel[] = ['potential', 'booked', 'confirmed']
   const cell = (n: number) => <td className={n ? '' : 'zero'}>{n ? formatEUR(n) : '—'}</td>
 
   return (
     <main className="wrap page">
       <header className="p-head">
+        <Link to="/pro/novia" className="icon-btn" aria-label="Retour à NOVIA">
+          <Icon name="arrowLeft" size={18} />
+        </Link>
         <div>
-          <div className="p-head__date">Revenue Attribution</div>
+          <div className="p-head__date">Ce que NOVIA rapporte</div>
           <h1 className="display">D’où vient le revenu</h1>
         </div>
       </header>

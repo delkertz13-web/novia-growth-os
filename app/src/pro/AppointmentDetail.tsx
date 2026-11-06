@@ -3,7 +3,7 @@ import { serviceById } from '../config/services.demo'
 import { attendanceState, isAwaitingValidation, noShowCounts, statusLabels } from '../core/appointmentStatus'
 import { appointmentLevel, formatEUR, levelLabels, sourceLabels } from '../core/revenue'
 import { buildValidationSms } from '../core/smsValidation'
-import { providers } from '../providers/mock'
+import { novia, originLabels } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, SimBadge, StatusPill, useDemoState, useNow } from '../ui/common'
 import { customerName, OutcomeButtons, RunCard } from './parts'
@@ -59,7 +59,13 @@ export function AppointmentDetail() {
           <StatusPill appointment={a} now={now} />
         </div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 18 }}>{customerName(c)}</div>
+          {c ? (
+            <Link to={`/pro/clientes/${c.id}`} className="detail-hero__who">
+              {customerName(c)} <Icon name="chevronRight" size={16} />
+            </Link>
+          ) : (
+            <div style={{ fontWeight: 600, fontSize: 18 }}>{customerName(c)}</div>
+          )}
           <div className="muted" style={{ fontSize: 14 }}>
             {s?.name} · {fmt.duration(a.durationMin)}
           </div>
@@ -69,16 +75,18 @@ export function AppointmentDetail() {
           <dd>{fmt.eur(a.price)}</dd>
           <dt>Niveau de revenu</dt>
           <dd>{level ? levelLabels[level] : 'Aucun'}</dd>
+          <dt>Pris via</dt>
+          <dd>{originLabels[a.bookingOrigin]}</dd>
           <dt>Attribution</dt>
           <dd>{sourceLabels[a.attribution]}</dd>
-          <dt>No-shows (30 j / 90 j / total)</dt>
+          <dt>Absences (30 j / 90 j / total)</dt>
           <dd>
             {counts.d30} / {counts.d90} / {counts.total}
           </dd>
           {c?.noShowRecovered && (
             <>
-              <dt>NO_SHOW_RECOVERED</dt>
-              <dd>TRUE</dd>
+              <dt>Absence déjà récupérée</dt>
+              <dd>Oui</dd>
             </>
           )}
         </dl>
@@ -113,7 +121,7 @@ export function AppointmentDetail() {
       )}
 
       {a.status === 'showed' && !a.paymentProof && (
-        <button className="btn btn--ghost" onClick={() => providers.payment.recordDemoPayment(a.id)}>
+        <button className="btn btn--ghost" onClick={() => novia.pro.recordPaymentProof(a.id)}>
           Simuler une preuve de paiement (fictive) → CA confirmé
         </button>
       )}
