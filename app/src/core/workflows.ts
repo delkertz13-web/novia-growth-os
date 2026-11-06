@@ -251,8 +251,31 @@ export const pauseRun = (run: WorkflowRun, now: Date): WorkflowRun =>
 /** La professionnelle rend la main : la séquence reprend, et revérifie tout avant le prochain envoi. */
 export const resumeRun = (run: WorkflowRun, now: Date): WorkflowRun =>
   run.state === 'paused'
-    ? { ...run, state: 'active', actions: [...run.actions, act(now, 'info', 'Rendue à NOVIA : reprise, avec revérification avant tout envoi.')] }
+    ? { ...run, state: 'active', actions: [...run.actions, act(now, 'info', 'Rendue à NOVIA par la professionnelle.')] }
     : run
+
+/**
+ * Rendre à NOVIA : la séquence en pause est relue contre l'état ACTUEL avant de reprendre
+ * (statut du RDV d'origine, nouveau RDV, opposition, consentement). Si la situation est
+ * devenue incompatible, elle s'arrête au lieu de reprendre. Aucun message n'est envoyé ici.
+ */
+export function resumeAfterRecheck(run: WorkflowRun, ctx: Omit<GuardContext, 'workflow' | 'runId'>): WorkflowRun {
+  if (run.state !== 'paused') return run
+  const { now } = ctx
+  const guard = evaluateGuards({ ...ctx, workflow: run.workflow, runId: run.id })
+  if (guard.kind === 'stop') {
+    const recovered = guard.transition === 'W02'
+    return stopRun(run, now, `Revérification au retour à NOVIA : ${guard.reason}${recovered ? ' → W02' : ''} STOP.`, recovered ? 'recovered' : 'stopped')
+  }
+  const resumed = resumeRun(run, now)
+  return {
+    ...resumed,
+    actions: [
+      ...resumed.actions,
+      act(now, guard.kind === 'send' ? 'check_ok' : 'blocked', guard.kind === 'send' ? 'Revérification : statut, nouveau RDV, consentement, opposition — OK.' : `Revérification OK, envoi différé — ${guard.reason}`),
+    ],
+  }
+}
 
 /**
  * Correction de statut : l'état actuel écrase l'ancien,

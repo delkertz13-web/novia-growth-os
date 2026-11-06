@@ -6,6 +6,7 @@
  * les providers Mock d'aujourd'hui et avec les providers GHL / Voice / Payment de
  * demain. Aucune logique propre à un backend ne vit ici ni dans les composants.
  */
+import { business } from '../config/business.demo'
 import type { ServiceConfig, WorkflowRules } from '../config/schema'
 import type { Appointment, NoviaSettings, ValidationOutcome, VoiceCall } from '../core/types'
 import type { BookingInput, Providers, SmartFillOutcome, VoiceSettings } from '../providers/types'
@@ -58,44 +59,54 @@ export function createNovia(p: Providers, opts: NoviaOptions) {
       return t
     })
 
-  /** Un appel arrive (simulation) : NOVIA Voice renseigne, propose un créneau et crée le RDV. */
+  /**
+   * Ce que NOVIA Voice dirait au prochain appel simulé : appelante, prestation, créneau
+   * réellement libre et transcription. Rien n'est réservé tant que l'appel n'aboutit pas.
+   */
+  const planIncomingCall = () => {
+    const voice = p.voice.getSettings()
+    if (!voice.active) throw new Error('NOVIA Voice est désactivé dans vos réglages.')
+    const known = new Set(p.voice.listCalls().map((c) => c.phone))
+    const caller = scriptedCallers.find((c) => !known.has(c.phone))
+    if (!caller) throw new Error('Tous les appels de démonstration ont été simulés. Réinitialisez la démo pour recommencer.')
+    const service = opts.services.find((s) => s.id === caller.serviceId)!
+    const now = p.clock.now()
+    let start: Date | undefined
+    for (let i = 1; i <= 14 && !start; i++) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
+      start = p.booking.getSlots(day, service.id)[0]
+    }
+    if (!start) throw new Error('Aucun créneau disponible dans les 14 prochains jours.')
+    const when = start.toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')
+    const transcript: VoiceCall['transcript'] = [
+      { from: 'novia', text: `${business.name.value}, bonjour ! ${business.artistFirstName.value} est en prestation, je suis son assistante. Comment puis-je vous aider ?` },
+      { from: 'caller', text: `Bonjour, je voudrais prendre rendez-vous pour un ${service.name.toLowerCase()}.` },
+      { from: 'novia', text: `Avec plaisir. Le ${service.name.toLowerCase()} est à ${service.price} €. Je peux vous proposer ${when}. Cela vous convient ?` },
+      { from: 'caller', text: 'Oui, parfait.' },
+      { from: 'novia', text: 'C’est noté. Vous recevrez une confirmation par SMS. Puis-je avoir votre nom ?' },
+      { from: 'caller', text: `${caller.firstName} ${caller.lastName}.` },
+    ]
+    return { caller, service, start, when, transcript, trigger: voice.mode, at: now }
+  }
+
+  /** L'appel simulé aboutit : NOVIA Voice crée (ou retrouve) la cliente et le RDV dans NOVIA. */
   const simulateIncomingCall = (): IntentResult<{ call: VoiceCall; appointment: Appointment }> =>
     attempt(() => {
-      const voice = p.voice.getSettings()
-      if (!voice.active) throw new Error('NOVIA Voice est désactivé dans vos réglages.')
-      const known = new Set(p.voice.listCalls().map((c) => c.phone))
-      const caller = scriptedCallers.find((c) => !known.has(c.phone))
-      if (!caller) throw new Error('Tous les appels de démonstration ont été simulés. Réinitialisez la démo pour recommencer.')
-      const service = opts.services.find((s) => s.id === caller.serviceId)!
-      const now = p.clock.now()
-      let start: Date | undefined
-      for (let i = 1; i <= 14 && !start; i++) {
-        const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
-        start = p.booking.getSlots(day, service.id)[0]
-      }
-      if (!start) throw new Error('Aucun créneau disponible dans les 14 prochains jours.')
-      const { serviceId: _s, ...contact } = caller
-      const appointment = p.booking.createBooking({ serviceId: service.id, start, contact, source: 'voice', origin: 'voice' })
-      const when = start.toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')
+      const plan = planIncomingCall()
+      const { serviceId: _s, ...contact } = plan.caller
+      const appointment = p.booking.createBooking({ serviceId: plan.service.id, start: plan.start, contact, source: 'voice', origin: 'voice' })
       const call = p.voice.logCall({
-        at: now.toISOString(),
-        callerName: `${caller.firstName} ${caller.lastName}`,
-        phone: caller.phone,
+        at: plan.at.toISOString(),
+        callerName: `${plan.caller.firstName} ${plan.caller.lastName}`,
+        phone: plan.caller.phone,
         customerId: appointment.customerId,
         durationSec: 118,
-        trigger: voice.mode,
+        trigger: plan.trigger,
         handledBy: 'novia',
         outcome: 'booked',
-        summary: `${service.name} → RDV ${when}`,
+        summary: `${plan.service.name} → RDV ${plan.when}`,
         appointmentId: appointment.id,
-        transcript: [
-          { from: 'novia', text: 'NOVIA Nails, bonjour ! Léa est en prestation, je suis son assistante. Comment puis-je vous aider ?' },
-          { from: 'caller', text: `Bonjour, je voudrais prendre rendez-vous pour un ${service.name.toLowerCase()}.` },
-          { from: 'novia', text: `Avec plaisir. Le ${service.name.toLowerCase()} est à ${service.price} €. Je peux vous proposer ${when}. Cela vous convient ?` },
-          { from: 'caller', text: 'Oui, parfait.' },
-          { from: 'novia', text: 'C’est noté. Vous recevrez une confirmation par SMS. Puis-je avoir votre nom ?' },
-          { from: 'caller', text: `${caller.firstName} ${caller.lastName}.` },
-        ],
+        transcript: plan.transcript,
       })
       return { call, appointment }
     })
@@ -211,7 +222,7 @@ export function createNovia(p: Providers, opts: NoviaOptions) {
     pro,
     client,
     /** Contrôles de simulation : `null` avec un backend réel (les boutons disparaissent). */
-    demo: p.demo ? { ...p.demo, simulateClientMessage, simulateIncomingCall } : null,
+    demo: p.demo ? { ...p.demo, simulateClientMessage, previewIncomingCall: () => attempt(planIncomingCall), simulateIncomingCall } : null,
   }
 }
 

@@ -14,11 +14,11 @@ export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}
 /** origine visible dans l'agenda quand NOVIA a obtenu le rendez-vous */
 const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'SmartFill', recovery: 'Récupération' }
 
-export function AppointmentRow({ a, customer, now }: { a: Appointment; customer?: Customer; now: Date }) {
+export function AppointmentRow({ a, customer, now, highlight }: { a: Appointment; customer?: Customer; now: Date; highlight?: boolean }) {
   const s = serviceById(a.serviceId)
   const past = appointmentEnd(a).getTime() < now.getTime() && attendanceState(a, now) !== 'unknown'
   return (
-    <Link to={`/pro/rdv/${a.id}`} className={`appt ${past ? 'is-past' : ''}`}>
+    <Link to={`/pro/rdv/${a.id}`} className={`appt ${past ? 'is-past' : ''} ${highlight ? 'is-highlight' : ''}`}>
       <div className="appt__time">
         {fmt.time(a.start)}
         <small>{fmt.duration(a.durationMin)}</small>

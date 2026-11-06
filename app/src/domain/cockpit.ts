@@ -55,14 +55,15 @@ export function buildToday(snap: Pick<NoviaSnapshot, 'appointments' | 'customers
 export interface FeedItem {
   id: string
   at: string
-  kind: WorkflowAction['kind'] | 'message'
+  /** win : NOVIA a obtenu un rendez-vous (Voice, SmartFill) */
+  kind: WorkflowAction['kind'] | 'message' | 'win'
   label: string
   who?: string
   workflow?: WorkflowId
   appointmentId?: string
 }
 
-export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'customers'>, limit = 6): FeedItem[] {
+export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'customers'> & Partial<Pick<NoviaSnapshot, 'calls' | 'appointments'>>, limit = 6): FeedItem[] {
   const byId = (id: string) => snap.customers.find((c) => c.id === id)
   const fromRuns = snap.runs.flatMap((r) =>
     r.actions.map(
@@ -81,7 +82,21 @@ export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'custo
   const fromMessages = snap.messages
     .filter((m) => m.purpose.startsWith('W02'))
     .map((m): FeedItem => ({ id: m.id, at: m.at, kind: 'message', label: `${m.purpose.replace('W02 · ', 'Message de ')} (simulé)`, who: m.to.split(' ')[0], workflow: 'W02' }))
-  return [...fromRuns, ...fromMessages].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit)
+  // ce que NOVIA a obtenu : appels Voice et créneaux remplis par SmartFill
+  const fromCalls = (snap.calls ?? [])
+    .filter((c) => c.handledBy === 'novia' && (c.outcome === 'booked' || c.outcome === 'transferred'))
+    .map((c): FeedItem => ({
+      id: c.id,
+      at: c.at,
+      kind: c.outcome === 'booked' ? 'win' : 'blocked',
+      label: c.outcome === 'booked' ? 'NOVIA Voice a pris un rendez-vous par téléphone (simulé)' : 'NOVIA Voice vous transfère un appel (simulé)',
+      who: c.callerName.split(' ')[0],
+      appointmentId: c.appointmentId,
+    }))
+  const fromSmartFill = (snap.appointments ?? [])
+    .filter((a) => a.bookingOrigin === 'smartfill' && a.bookedAt)
+    .map((a): FeedItem => ({ id: `sf-${a.id}`, at: a.bookedAt!, kind: 'win', label: 'SmartFill a rempli un créneau libéré (simulé)', who: byId(a.customerId)?.firstName, appointmentId: a.id }))
+  return [...fromRuns, ...fromMessages, ...fromCalls, ...fromSmartFill].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit)
 }
 
 /* ------------------------------------------------------------------ */

@@ -18,7 +18,7 @@ import {
   markRecovered,
   pauseRun,
   reminderTimes,
-  resumeRun,
+  resumeAfterRecheck,
   startRecovery,
   stopObsoleteRuns,
 } from '../../core/workflows'
@@ -113,13 +113,25 @@ export const MockCRMProvider: CRMProvider = {
   },
   setHumanTakeover(customerId, value) {
     const t = now()
-    setState((s) => ({
-      ...s,
-      customers: s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c)),
+    setState((s) => {
+      const customers = s.customers.map((c) => (c.id === customerId ? { ...c, humanTakeover: value } : c))
+      const customer = customers.find((c) => c.id === customerId)!
       // reprise humaine : les séquences automatiques de cette cliente se mettent en pause ;
-      // rendre la main les relance, avec revérification complète avant tout envoi
-      runs: s.runs.map((r) => (r.customerId !== customerId ? r : value ? pauseRun(r, t) : resumeRun(r, t))),
-    }))
+      // rendre la main les relit contre l'état actuel avant de les reprendre (ou de les arrêter)
+      const runs = s.runs.map((r) =>
+        r.customerId !== customerId
+          ? r
+          : value
+            ? pauseRun(r, t)
+            : resumeAfterRecheck(r, { customer, appointments: s.appointments, runs: s.runs, now: t, rules: liveRules(), sourceAppointment: s.appointments.find((a) => a.id === r.appointmentId) }),
+      )
+      // une séquence arrêtée à la revérification ne laisse plus de montant « à récupérer » s'il est devenu obsolète
+      const ended = runs.filter((r, i) => r !== s.runs[i] && r.state === 'stopped').map((r) => r.appointmentId)
+      const opportunities = s.opportunities.map((o) =>
+        o.status === 'open' && o.kind !== 'smartfill' && ended.includes(o.sourceAppointmentId) ? { ...o, status: 'lost' as const } : o,
+      )
+      return { ...s, customers, runs, opportunities }
+    })
   },
 }
 

@@ -1,21 +1,10 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { needsHumanCount } from '../domain'
-import { Icon, type IconName } from '../ui/Icon'
+import { Icon } from '../ui/Icon'
+import { proTabs as tabs } from './nav'
 import { useDemoState } from '../ui/common'
 import './pro.css'
 import './ops.css'
-
-/**
- * Cinq destinations du quotidien. Voice, Revenue et Réglages vivent dans l'espace NOVIA
- * (et Réglages aussi derrière l'avatar) : jamais huit icônes en bas de l'écran.
- */
-const tabs: { to: string; label: string; icon: IconName; end?: boolean; also?: string[] }[] = [
-  { to: '/pro', label: 'Accueil', icon: 'home', end: true },
-  { to: '/pro/agenda', label: 'Agenda', icon: 'calendar', also: ['/pro/rdv'] },
-  { to: '/pro/clientes', label: 'Clientes', icon: 'user', also: ['/pro/cliente'] },
-  { to: '/pro/messages', label: 'Messages', icon: 'message' },
-  { to: '/pro/novia', label: 'NOVIA', icon: 'sparkle', also: ['/pro/voice', '/pro/revenue', '/pro/reglages'] },
-]
 
 export function ProLayout() {
   const { pathname } = useLocation()

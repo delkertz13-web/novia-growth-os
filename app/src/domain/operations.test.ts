@@ -3,7 +3,9 @@
  * Les modules partagent le même domaine et le même store : une action dans l'un
  * se voit dans les autres. Providers Mock réels, jeu de démonstration de référence.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { proTabs } from '../pro/nav'
+import { createSeed } from '../providers/mock/seed'
 import { rules } from '../config/rules.demo'
 import { services } from '../config/services.demo'
 import { providers } from '../providers/mock'
@@ -20,7 +22,18 @@ const ok = <T,>(r: { ok: true; value: T } | { ok: false; error: string }): T => 
 }
 const customerByName = (first: string) => snap().customers.find((c) => c.firstName === first)!
 
-beforeEach(() => providers.demo!.reset())
+const network = { fetch: vi.fn(), xhr: vi.fn(), ws: vi.fn() }
+beforeEach(() => {
+  providers.demo!.reset()
+  vi.stubGlobal('fetch', network.fetch)
+  vi.stubGlobal('XMLHttpRequest', network.xhr)
+  vi.stubGlobal('WebSocket', network.ws)
+})
+afterEach(() => {
+  // aucune action de l'exploitation quotidienne ne touche le réseau
+  for (const spy of Object.values(network)) expect(spy).not.toHaveBeenCalled()
+  vi.unstubAllGlobals()
+})
 
 describe('Clientes', () => {
   it('recherche sans accents, par nom ou téléphone', () => {
@@ -89,7 +102,7 @@ describe('Messages : NOVIA ↔ professionnelle', () => {
     expect(novia.pro.customerFile(oceane.id, now())!.segments).toContain('human')
     ok(novia.pro.letNoviaHandle(oceane.id))
     expect(run().state).toBe('active')
-    expect(run().actions.at(-1)!.label).toMatch(/revérification/)
+    expect(run().actions.at(-1)!.label).toMatch(/revérification/i)
   })
 
   it('répondre soi-même vaut reprise humaine ; NOVIA ne répond plus à cette cliente', () => {
@@ -173,5 +186,116 @@ describe('SmartFill → fiche cliente', () => {
     expect(file.upcoming?.attribution).toBe('smartfill')
     const tl = novia.pro.timeline(res.customer.id, now())
     expect(tl.history.some((e) => e.kind === 'booked' && e.byNovia && e.detail?.includes('SmartFill'))).toBe(true)
+  })
+})
+
+describe('Rendre à NOVIA : revérification avant de reprendre', () => {
+  const oceane = () => customerByName('Océane')
+  let id = ''
+  const run = () => snap().runs.find((r) => r.id === id)!
+  beforeEach(() => {
+    id = snap().runs.find((r) => r.customerId === oceane().id && r.workflow === 'W04' && r.state === 'active')!.id
+  })
+
+  it('une opposition apparue pendant la reprise humaine arrête la séquence au lieu de la reprendre', () => {
+    ok(novia.pro.takeOverConversation(oceane().id))
+    const toRecover = novia.pro.cockpit(now()).revenue.toRecover
+    // la cliente répond STOP pendant que Léa gère (simulé directement dans le store de démo)
+    snap().customers.find((c) => c.id === oceane().id)!.optOut = true
+    ok(novia.pro.letNoviaHandle(oceane().id))
+    expect(run().state).toBe('stopped')
+    expect(run().actions.at(-1)!.label).toMatch(/Opposition/)
+    expect(novia.pro.cockpit(now()).revenue.toRecover).toBeLessThan(toRecover)
+  })
+
+  it('un nouveau RDV pris pendant la reprise humaine clôt la récupération (→ W02)', () => {
+    ok(novia.pro.takeOverConversation(oceane().id))
+    const slot = novia.pro.availableSlots(new Date(now().getFullYear(), now().getMonth(), now().getDate() + 2), 'semi-permanent')[0]
+    novia.client.book({ serviceId: 'semi-permanent', start: slot, contact: { firstName: 'Océane', lastName: 'Blanc', phone: oceane().phone, email: oceane().email }, source: 'site', origin: 'site' })
+    expect(run().state).toBe('completed')
+    ok(novia.pro.letNoviaHandle(oceane().id))
+    expect(run().state).toBe('completed')
+  })
+})
+
+describe('Revenue : niveaux et double comptage sur les nouvelles actions', () => {
+  it('un RDV Voice à 70 € est « réservé », jamais « confirmé », et compté une seule fois', () => {
+    const before = novia.pro.revenueAttribution()
+    const { appointment } = ok(novia.demo!.simulateIncomingCall())
+    const after = novia.pro.revenueAttribution()
+    expect(after.totals.booked - before.totals.booked).toBe(appointment.price)
+    expect(after.totals.confirmed).toBe(before.totals.confirmed)
+    expect(after.totals.potential).toBe(before.totals.potential)
+    const sources = Object.entries(after.bySource).filter(([k, v]) => v.booked !== before.bySource[k as keyof typeof before.bySource].booked)
+    expect(sources.map(([k]) => k)).toEqual(['voice'])
+  })
+
+  it('SmartFill : potentiel → réservé, un seul compte, visible dans l’agenda, la fiche et l’activité NOVIA', () => {
+    const slot = novia.pro.cockpit(now()).freedSlots[0]
+    const before = novia.pro.revenueAttribution()
+    const res = ok(novia.pro.launchSmartFill(slot.id))!
+    const after = novia.pro.revenueAttribution()
+    expect(after.bySource.smartfill.booked - before.bySource.smartfill.booked).toBe(res.appointment.price)
+    expect(after.totals.potential).toBeLessThan(before.totals.potential)
+    expect(after.totals.confirmed).toBe(before.totals.confirmed)
+    expect(snap().appointments.filter((a) => a.start === slot.slotStart && a.status === 'booked')).toHaveLength(1)
+    expect(novia.pro.cockpit(now()).feed.some((f) => f.kind === 'win' && f.appointmentId === res.appointment.id)).toBe(true)
+  })
+
+  it('l’appel Voice apparaît dans l’activité NOVIA du cockpit', () => {
+    const { appointment } = ok(novia.demo!.simulateIncomingCall())
+    expect(novia.pro.cockpit(now()).feed.some((f) => f.kind === 'win' && f.appointmentId === appointment.id)).toBe(true)
+  })
+
+  it('aperçu d’appel : rien n’est réservé tant que l’appel n’aboutit pas', () => {
+    const n = snap().appointments.length
+    const plan = ok(novia.demo!.previewIncomingCall())
+    expect(snap().appointments.length).toBe(n)
+    const { appointment } = ok(novia.demo!.simulateIncomingCall())
+    expect(appointment.start).toBe(plan.start.toISOString())
+  })
+})
+
+describe('Démonstration : horloge et remise à zéro', () => {
+  it('les nouveaux modules donnent le même scénario quelle que soit l’heure réelle', () => {
+    const read = () => JSON.stringify([novia.now(), novia.pro.inbox(), novia.pro.voiceStats(), novia.pro.customers(now()).map((r) => r.segments), novia.pro.timeline('c13', now())])
+    const views = ['2026-11-05T08:05:00+01:00', '2026-11-15T13:00:00+01:00', '2026-11-30T23:50:00+01:00', '2027-03-02T21:40:00+01:00'].map((t) => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date(t))
+      const v = read()
+      vi.useRealTimers()
+      return v
+    })
+    expect(new Set(views).size).toBe(1)
+  })
+
+  it('réinitialiser la démo efface conversations, appels, réglages et reprises', () => {
+    const fresh = createSeed(novia.now())
+    ok(novia.demo!.simulateIncomingCall())
+    ok(novia.pro.takeOverConversation('c13'))
+    ok(novia.pro.updateSettings({ automations: { smartFill: false } }))
+    const conv = novia.pro.inbox()[0].conversation.id
+    ok(novia.pro.replyAsPro(conv, 'Test'))
+    novia.demo!.reset()
+    const s = snap()
+    expect(s.calls).toEqual(fresh.calls)
+    expect(s.conversations).toEqual(fresh.conversations)
+    expect(s.settings).toEqual(fresh.settings)
+    expect(s.customers.filter((c) => c.humanTakeover).map((c) => c.id)).toEqual(['c20'])
+    expect(s.appointments.length).toBe(fresh.appointments.length)
+  })
+})
+
+describe('Navigation mobile', () => {
+  it('cinq onglets au plus, et chaque page Pro rattachée à un onglet', () => {
+    expect(proTabs.length).toBeLessThanOrEqual(5)
+    const main = Object.values(import.meta.glob('../main.tsx', { query: '?raw', import: 'default', eager: true }))[0] as string
+    const block = main.slice(main.indexOf("path: '/pro'"))
+    const paths = [...block.matchAll(/path: '([a-z]+)(?:\/:id)?'/g)].map((m) => `/pro/${m[1]}`)
+    expect(paths.length).toBeGreaterThanOrEqual(10)
+    for (const p of paths) {
+      const owner = proTabs.find((t) => p.startsWith(t.to) && t.to !== '/pro') ?? proTabs.find((t) => t.also?.some((a) => p.startsWith(a)))
+      expect(owner, p).toBeDefined()
+    }
   })
 })

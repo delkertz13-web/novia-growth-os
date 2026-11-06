@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { callOutcomeLabels, filterCalls, novia, voiceModeLabels, type CallFilter, type VoiceCall, type VoiceMode } from '../domain'
 import { Icon } from '../ui/Icon'
@@ -11,6 +11,10 @@ const filters: { id: CallFilter; label: string }[] = [
   { id: 'after_hours', label: 'Hors horaires' },
 ]
 
+const dayKey = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 const duration = (s: number) => `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}`
 
 /** Standard téléphonique NOVIA — entièrement simulé. */
@@ -20,7 +24,7 @@ export function Voice() {
   const [params, setParams] = useSearchParams()
   const [filter, setFilter] = useState<CallFilter>('all')
   const [error, setError] = useState('')
-  const [ringing, setRinging] = useState(false)
+  const [live, setLive] = useState(false)
   const callId = params.get('appel')
   const calls = filterCalls(novia.pro.calls(), filter)
   const stats = novia.pro.voiceStats()
@@ -28,15 +32,9 @@ export function Voice() {
 
   const simulate = () => {
     setError('')
-    setRinging(true)
-    // le délai rend la scène lisible ; rien n'est appelé
-    setTimeout(() => {
-      setRinging(false)
-      const r = novia.demo?.simulateIncomingCall()
-      if (!r) return
-      if (r.ok) setParams({ appel: r.value.call.id })
-      else setError(r.error)
-    }, 1200)
+    const r = novia.demo?.previewIncomingCall()
+    if (r && !r.ok) return setError(r.error)
+    setLive(true)
   }
 
   return (
@@ -64,8 +62,8 @@ export function Voice() {
       <VoiceControls />
 
       {novia.demo && (
-        <button className={`btn btn--lacquer btn--block voice-sim ${ringing ? 'is-ringing' : ''}`} onClick={simulate} disabled={ringing || !st.voice.active}>
-          <Icon name="phone" size={18} /> {ringing ? 'Appel entrant… NOVIA décroche' : 'Simuler un appel entrant'}
+        <button className="btn btn--lacquer btn--block voice-sim" onClick={simulate} disabled={live || !st.voice.active}>
+          <Icon name="phone" size={18} /> Simuler un appel entrant
         </button>
       )}
       {!st.voice.active && <p className="ops-hint">NOVIA Voice est en pause : les appels sonnent normalement chez vous.</p>}
@@ -106,11 +104,88 @@ export function Voice() {
       <Sheet open={!!open} onClose={() => setParams({}, { replace: true })} label="Détail de l’appel">
         {open && <CallDetail call={open} onClose={() => setParams({}, { replace: true })} />}
       </Sheet>
+      <Sheet open={live} onClose={() => setLive(false)} label="Appel en cours (simulé)">
+        {live && (
+          <LiveCall
+            onBooked={(id) => {
+              setLive(false)
+              setParams({ appel: id, nouveau: '1' })
+            }}
+            onError={(e) => {
+              setLive(false)
+              setError(e)
+            }}
+          />
+        )}
+      </Sheet>
     </main>
   )
 }
 
+const reduced = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Appel en direct (simulé) : la transcription se déroule, puis l'appel aboutit et le RDV est
+ * réellement créé dans NOVIA (même domaine, même store que l'agenda et les fiches).
+ */
+function LiveCall({ onBooked, onError }: { onBooked: (callId: string) => void; onError: (e: string) => void }) {
+  const [plan] = useState(() => novia.demo?.previewIncomingCall())
+  const [shown, setShown] = useState(() => (reduced() ? 99 : 0))
+  const [phase, setPhase] = useState<'talking' | 'booking'>('talking')
+  const lines = plan?.ok ? plan.value.transcript : []
+  useEffect(() => {
+    if (!plan?.ok) return
+    if (shown < lines.length) {
+      const t = setTimeout(() => setShown((n) => n + 1), shown === 0 ? 500 : 950)
+      return () => clearTimeout(t)
+    }
+    setPhase('booking')
+    const t = setTimeout(() => {
+      const r = novia.demo?.simulateIncomingCall()
+      if (r?.ok) onBooked(r.value.call.id)
+      else onError(r && !r.ok ? r.error : 'Appel impossible')
+    }, reduced() ? 0 : 900)
+    return () => clearTimeout(t)
+  }, [shown, lines.length, plan, onBooked, onError])
+  if (!plan?.ok) return null
+  const { caller } = plan.value
+  return (
+    <div className="call" aria-live="polite">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="eyebrow call__live">
+          <span className="call__live-dot" aria-hidden="true" /> Appel en cours · NOVIA a décroché
+        </span>
+        <span className="badge badge--sim">Simulé</span>
+      </div>
+      <h2 className="display call__name">
+        {caller.firstName} {caller.lastName}
+      </h2>
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+        {caller.phone} · numéro inconnu de NOVIA
+      </p>
+      <div className="call__transcript">
+        {lines.slice(0, shown).map((l, i) => (
+          <div key={i} className={`bubble bubble--${l.from === 'novia' ? 'novia' : 'client'} bubble--in`}>
+            {l.from === 'novia' && (
+              <span className="bubble__who">
+                <Icon name="sparkle" size={11} /> NOVIA
+              </span>
+            )}
+            <span className="bubble__text">{l.text}</span>
+          </div>
+        ))}
+      </div>
+      <div className={`call__outcome ${phase === 'booking' ? 'call__outcome--booking' : ''}`}>
+        <strong>{phase === 'booking' ? 'NOVIA crée la cliente et le rendez-vous…' : 'NOVIA répond avec vos informations approuvées'}</strong>
+        <span>Aucun appel réel : la conversation est simulée.</span>
+      </div>
+    </div>
+  )
+}
+
 function CallDetail({ call: c, onClose }: { call: VoiceCall; onClose: () => void }) {
+  const [params] = useSearchParams()
+  const fresh = params.get('nouveau') === '1'
   const appt = c.appointmentId ? novia.pro.appointment(c.appointmentId) : undefined
   return (
     <div className="call">
@@ -124,9 +199,10 @@ function CallDetail({ call: c, onClose }: { call: VoiceCall; onClose: () => void
       <p className="muted" style={{ margin: 0, fontSize: 13 }}>
         {c.phone} · {duration(c.durationSec)} · {c.handledBy === 'novia' ? `NOVIA (${voiceModeLabels[c.trigger === 'all' ? 'all' : c.trigger].title.toLowerCase()})` : 'pris par vous'}
       </p>
-      <div className={`call__outcome call__outcome--${c.outcome}`}>
+      <div className={`call__outcome call__outcome--${c.outcome} ${fresh ? 'is-fresh' : ''}`}>
         <strong>{callOutcomeLabels[c.outcome]}</strong>
         <span>{c.summary}</span>
+        {fresh && appt && <span className="call__fresh">Ajouté à l’agenda, à sa fiche et à Revenue (réservé, pas encore confirmé).</span>}
       </div>
       {c.transcript.length > 0 ? (
         <div className="call__transcript" aria-label="Transcription">
@@ -148,6 +224,11 @@ function CallDetail({ call: c, onClose }: { call: VoiceCall; onClose: () => void
         {appt && (
           <Link to={`/pro/rdv/${appt.id}`} className="btn btn--primary btn--sm" onClick={onClose}>
             <Icon name="calendar" size={15} /> Voir le RDV · {capitalize(fmt.dayShort(appt.start))} {fmt.time(appt.start)}
+          </Link>
+        )}
+        {appt && (
+          <Link to={`/pro/agenda?jour=${dayKey(appt.start)}&rdv=${appt.id}`} className="btn btn--glass btn--sm" onClick={onClose}>
+            <Icon name="calendar" size={15} /> Dans l’agenda
           </Link>
         )}
         {c.customerId && (
