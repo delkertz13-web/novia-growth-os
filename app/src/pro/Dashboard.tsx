@@ -71,7 +71,6 @@ export function Dashboard() {
           {runs > 0 && ` · ${runs} récupération${runs > 1 ? 's' : ''} en cours`}
           {slots > 0 && ` · ${slots} créneau${slots > 1 ? 'x' : ''} à remplir`}
         </span>
-        <span className="ck-pulse__demo">Démo</span>
       </p>
 
       <section className="ck-panel" aria-label="Le salon aujourd’hui">
@@ -111,7 +110,7 @@ export function Dashboard() {
               <Counter value={slots} />
             </span>
             <span className="ck-kpi__l">créneau{slots > 1 ? 'x' : ''} libéré{slots > 1 ? 's' : ''}</span>
-            <span className="ck-kpi__lv">SmartFill</span>
+            <span className="ck-kpi__lv">NOVIA cherche une cliente</span>
           </Link>
         </div>
         <button type="button" className="ck-how" onClick={() => setHow(true)}>
@@ -191,7 +190,6 @@ export function Dashboard() {
           <h2 className="p-section__title" id="ck-novia">
             NOVIA en action
           </h2>
-          <span className="badge badge--sim">Simulation</span>
         </div>
         <div className="ck-novia">
           {view.freedSlots.slice(0, 1).map((o) => (
@@ -205,7 +203,7 @@ export function Dashboard() {
               <span className="ck-hint">
                 {o.slotDurationMin} min · {formatEUR(o.amount)} à récupérer
               </span>
-              <span className="btn btn--lacquer btn--sm">Lancer SmartFill</span>
+              <span className="btn btn--lacquer btn--sm">Remplir ce créneau</span>
             </Link>
           ))}
           <Link to="/pro/novia" className="ck-tile">

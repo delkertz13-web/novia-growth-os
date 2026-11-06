@@ -3,7 +3,7 @@ import { business } from '../config/business.demo'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { approvedAnswersList, channelLabels, conversationStateLabels, novia, type ConversationState, type InboxItem } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, sameDay, SimBadge, useDemoState, useNow } from '../ui/common'
+import { capitalize, fmt, sameDay, useDemoState, useNow } from '../ui/common'
 
 type Filter = 'all' | ConversationState
 const filters: { id: Filter; label: string }[] = [
@@ -33,7 +33,6 @@ export function Messages() {
           <div className="p-head__date">Messages</div>
           <h1 className="display">Conversations</h1>
         </div>
-        <SimBadge />
       </header>
       <p className="ops-hint" style={{ marginTop: 0 }}>
         NOVIA répond seule avec vos réponses approuvées. Pour une question inconnue ou un sujet sensible, elle s’arrête et vous prévient.

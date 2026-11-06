@@ -14,7 +14,7 @@ type AutoKey = keyof NoviaSettings['automations']
 const automations: { key: AutoKey; title: string; help: string; soon?: boolean }[] = [
   { key: 'cancellationRecovery', title: 'Récupérer les annulations', help: 'Après une annulation, NOVIA propose un nouveau créneau à la cliente.' },
   { key: 'noShowRecovery', title: 'Récupérer les absences', help: 'Après une absence, un message bienveillant pour reprendre rendez-vous.' },
-  { key: 'smartFill', title: 'Remplir les créneaux libérés', help: 'SmartFill propose le créneau aux clientes en attente ou proches d’un remplissage.' },
+  { key: 'smartFill', title: 'Remplir les créneaux libérés', help: 'Quand un créneau se libère, NOVIA le propose aux clientes en attente ou proches d’un remplissage.' },
   { key: 'rebooking', title: 'Rappeler les remplissages', help: 'NOVIA repère les clientes dont le remplissage approche.' },
   { key: 'reviews', title: 'Demander un avis', help: 'Après la prestation.', soon: true },
   { key: 'referral', title: 'Parrainage', help: 'Une cliente recommande une amie.', soon: true },

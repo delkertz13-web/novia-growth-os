@@ -20,18 +20,18 @@ export const kpiDefinitions: KpiDefinition[] = [
     id: 'toRecover',
     label: 'À récupérer',
     level: 'potentiel',
-    rule: 'Rendez-vous perdus (absence, annulation) que NOVIA peut encore regagner. Chaque rendez-vous perdu compte une seule fois, même s’il ouvre une relance et un créneau SmartFill. Il sort du total dès qu’il est regagné. Ce n’est ni réservé, ni encaissé.',
+    rule: 'Rendez-vous perdus (absence, annulation) que NOVIA peut encore regagner. Chaque rendez-vous perdu compte une seule fois, même s’il ouvre à la fois une relance et un créneau à remplir. Il sort du total dès qu’il est regagné. Ce n’est ni réservé, ni encaissé.',
   },
   {
     id: 'noviaWon',
     label: 'Gagné par NOVIA',
     level: 'réservé + confirmé',
-    rule: 'Rendez-vous obtenus ce mois-ci (selon la date du rendez-vous) grâce à SmartFill ou à une récupération d’annulation ou d’absence. La part « confirmée » est celle dont la prestation est attestée avec une preuve de paiement. Une attribution n’est pas une preuve de causalité.',
+    rule: 'Rendez-vous obtenus ce mois-ci (selon la date du rendez-vous) grâce à NOVIA : créneau libéré rempli, annulation ou absence récupérée, appel pris par NOVIA Voice. La part « confirmée » est celle dont la prestation est attestée avec une preuve de paiement. Une attribution n’est pas une preuve de causalité.',
   },
   {
     id: 'freedSlots',
     label: 'Créneaux libérés',
     level: 'aucun montant',
-    rule: 'Créneaux à venir libérés par une annulation, que SmartFill peut proposer. Leur valeur est déjà incluse dans « À récupérer ».',
+    rule: 'Créneaux à venir libérés par une annulation, que NOVIA peut proposer à une cliente. Leur valeur est déjà incluse dans « À récupérer ».',
   },
 ]

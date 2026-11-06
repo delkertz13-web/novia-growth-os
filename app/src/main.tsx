@@ -22,13 +22,20 @@ import { Novia } from './pro/Novia'
 import { ProLayout } from './pro/ProLayout'
 import { Revenue } from './pro/Revenue'
 import { DemoBanner, ScrollTop } from './ui/common'
+import { useResetEpoch } from './ui/demo'
+
+/** Après une réinitialisation de la démo, les écrans repartent de zéro (aucun état résiduel). */
+function Epoch() {
+  const epoch = useResetEpoch()
+  return <Outlet key={epoch} />
+}
 
 function Root() {
   return (
     <>
       <ScrollTop />
       <DemoBanner />
-      <Outlet />
+      <Epoch />
     </>
   )
 }

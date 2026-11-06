@@ -37,7 +37,7 @@ export interface DemoState {
   settings: NoviaSettings
 }
 
-export const STATE_VERSION = 6
+export const STATE_VERSION = 7
 
 const H = 3_600_000
 const D = 24 * H
@@ -195,6 +195,12 @@ export function createSeed(now: Date): DemoState {
   add('c04', 'pose-gel', atOpenDayBack(now, 13, '10:00'), 'showed', { paid: true, attribution: 'referral' })
   add('c05', 'remplissage', atOpenDayBack(now, 6, '10:00'), 'showed', { paid: true })
   add('c11', 'pose-gel', atOpenDayBack(now, 10, '13:00'), 'showed', { paid: true })
+  // chaque cliente connue a un historique cohérent avec ses messages et sa liste d'attente
+  add('c01', 'pose-gel', atOpenDayBack(now, 20, '13:00'), 'showed', { paid: true })
+  add('c20', 'pose-gel', atOpenDayBack(now, 5, '15:00'), 'showed', { paid: true })
+  add('c18', 'remplissage', atOpenDayBack(now, 16, '16:00'), 'showed', { paid: true })
+  add('c19', 'semi-permanent', atOpenDayBack(now, 15, '11:00'), 'showed', { paid: true, attribution: 'referral' })
+  add('c21', 'remplissage', atOpenDayBack(now, 11, '15:00'), 'showed', { paid: true })
   // Remplissages à prévoir (délais fictifs : 19 et 23 jours…)
   add('c14', 'remplissage', atOpenDayBack(now, 19, '11:00'), 'showed', { paid: true })
   add('c15', 'remplissage', atOpenDayBack(now, 23, '14:00'), 'showed', { paid: true })
@@ -240,8 +246,8 @@ export function createSeed(now: Date): DemoState {
       outcome: 'recovered',
       actions: [
         { at: new Date(t1 + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par la professionnelle.' },
-        { at: new Date(t1 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
-        { at: new Date(t1 + 24 * H).toISOString(), kind: 'stop', label: 'Nouveau rendez-vous réservé : STOP → W02. NO_SHOW_RECOVERED = TRUE' },
+        { at: new Date(t1 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message bienveillant, sans reproche, avec un nouveau créneau (simulé).' },
+        { at: new Date(t1 + 24 * H).toISOString(), kind: 'stop', label: 'Nouveau rendez-vous réservé : absence récupérée.' },
       ],
     },
     {
@@ -255,8 +261,8 @@ export function createSeed(now: Date): DemoState {
       startedAt: new Date(t2 + 3 * H).toISOString(),
       actions: [
         { at: new Date(t2 + 3 * H).toISOString(), kind: 'info', label: 'Absence confirmée par validation SMS.' },
-        { at: new Date(t2 + 6 * H).toISOString(), kind: 'check_ok', label: 'Revérification : statut, nouveau RDV, opposition, reprise humaine — OK.' },
-        { at: new Date(t2 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message de récupération non culpabilisant (simulé).' },
+        { at: new Date(t2 + 6 * H).toISOString(), kind: 'check_ok', label: 'Vérification avant envoi : situation inchangée, pas de nouveau RDV, pas d’opposition.' },
+        { at: new Date(t2 + 6 * H).toISOString(), kind: 'message_simulated', label: 'Message bienveillant, sans reproche, avec un nouveau créneau (simulé).' },
       ],
     },
     {
@@ -269,9 +275,9 @@ export function createSeed(now: Date): DemoState {
       messagesSent: 0,
       startedAt: new Date(n - 5 * H).toISOString(),
       actions: [
-        { at: new Date(n - 5 * H).toISOString(), kind: 'info', label: 'Annulation confirmée : rappels W02 stoppés.' },
-        { at: new Date(n - 5 * H).toISOString(), kind: 'check_ok', label: 'Aucun nouveau RDV, aucune demande de déplacement.' },
-        { at: new Date(n - 5 * H).toISOString(), kind: 'info', label: 'Attente avant récupération : 2 h (paramètre démo).' },
+        { at: new Date(n - 5 * H).toISOString(), kind: 'info', label: 'Annulation confirmée : les rappels sont arrêtés.' },
+        { at: new Date(n - 5 * H).toISOString(), kind: 'check_ok', label: 'Pas de nouveau rendez-vous, pas de demande de déplacement.' },
+        { at: new Date(n - 5 * H).toISOString(), kind: 'info', label: 'NOVIA attend 2 h avant d’écrire.' },
       ],
     },
   ]
@@ -301,7 +307,7 @@ export function createSeed(now: Date): DemoState {
     waitlist,
     messages: [],
     voice: { active: true, mode: 'missed' },
-    conversations: seedConversations(now),
+    conversations: seedConversations(now, t2 + 6 * H),
     calls: seedCalls(now, { sarah: sarahRdv.id, yasmine: appointments.find((a) => a.customerId === 'c07')!.id }),
     settings: structuredClone(defaultSettings),
   }
@@ -311,12 +317,26 @@ export function createSeed(now: Date): DemoState {
 /* Conversations de démonstration                                       */
 /* ------------------------------------------------------------------ */
 
-function seedConversations(now: Date): Conversation[] {
+function seedConversations(now: Date, oceaneMsgAt: number): Conversation[] {
+  const missed = new Date(oceaneMsgAt).toLocaleDateString('fr-FR', { weekday: 'long' })
   const n = now.getTime()
   const at = (minAgo: number) => new Date(n - minAgo * 60_000).toISOString()
   let k = 0
   const m = (minAgo: number, from: 'client' | 'novia' | 'pro', body: string, faqId?: string) => ({ id: `cm${++k}`, at: at(minAgo), from, body, ...(faqId ? { faqId } : {}) })
   return [
+    {
+      // Océane a répondu au message de récupération de NOVIA : sa demande attend Léa
+      id: 'conv-c13',
+      customerId: 'c13',
+      channel: 'sms',
+      needsHuman: true,
+      needsHumanReason: 'Elle demande à vous parler avant de reprendre rendez-vous',
+      unread: true,
+      messages: [
+        { id: 'cm-c13-1', at: new Date(oceaneMsgAt).toISOString(), from: 'novia', body: `Bonjour Océane, nous ne vous avons pas vue ${missed}, j’espère que tout va bien. Souhaitez-vous un nouveau créneau ?` },
+        m(95 * 60, 'client', `Bonjour, désolée pour ${missed}, j’ai eu un souci de garde. Est-ce que Léa pourrait me garder un créneau tôt le matin la semaine prochaine ? Je ne peux pas avant 9h30.`),
+      ],
+    },
     {
       id: 'conv-c09',
       customerId: 'c09',

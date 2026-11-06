@@ -26,7 +26,7 @@ export const originLabels: Record<BookingOrigin, string> = {
   site: 'Site',
   pro: 'Saisi par vous',
   voice: 'NOVIA Voice',
-  smartfill: 'SmartFill',
+  smartfill: 'Créneau rempli par NOVIA',
   recovery: 'Récupération NOVIA',
 }
 
@@ -57,7 +57,7 @@ function appointmentEvents(a: Appointment, rules: WorkflowRules, services: Servi
   const statusAt = (to: Appointment['status']) => a.history.find((h) => h.to === to)?.at
   if (a.status === 'showed') {
     out.push({ id: id('service'), at: end, kind: 'service', title: `Prestation · ${name}`, detail: 'Présence attestée', appointmentId: a.id })
-    if (isLastShowed) out.push({ id: id('sat'), at: end, kind: 'satisfaction', title: 'Satisfaction', detail: 'Message d’avis : W05 à concevoir, rien n’est envoyé', appointmentId: a.id })
+    if (isLastShowed) out.push({ id: id('sat'), at: end, kind: 'satisfaction', title: 'Satisfaction', detail: 'Demande d’avis : bientôt, rien n’est envoyé', appointmentId: a.id })
   }
   if (a.status === 'no_show') out.push({ id: id('ns'), at: statusAt('no_show') ?? a.start, kind: 'attendance', title: `Absente · ${name}`, detail: `RDV du ${when}`, appointmentId: a.id })
   if (a.status === 'cancelled') out.push({ id: id('cx'), at: statusAt('cancelled') ?? a.start, kind: 'cancelled', title: `Annulation · ${name}`, detail: `RDV du ${when}`, appointmentId: a.id })

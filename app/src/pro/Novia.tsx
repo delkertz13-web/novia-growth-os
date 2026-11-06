@@ -26,7 +26,6 @@ export function Novia() {
   const voice = novia.pro.voiceStats()
   const won = novia.pro.cockpit(now).revenue.noviaWonThisMonth
 
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const recentNoShows = st.appointments.filter((a) => a.status === 'no_show' && new Date(a.start) >= new Date(now.getTime() - 30 * 86_400_000))
   const recovered = st.opportunities.filter((o) => o.kind === 'noshow_recovery' && o.status === 'won').length
   const nsPotential = st.opportunities.filter((o) => o.kind === 'noshow_recovery' && o.status === 'open').reduce((s, o) => s + o.amount, 0)
@@ -61,15 +60,17 @@ export function Novia() {
       </nav>
 
       <p className="muted" style={{ margin: '18px 0 0', fontSize: 14 }}>
-        Toutes les actions ci-dessous sont simulées : aucun message n’est envoyé, aucune cliente n’est contactée.
+        Ce que NOVIA fait pour vous en ce moment. Les messages sont simulés : aucune cliente n’est contactée.
       </p>
 
       <section className="p-section">
         <div className="p-section__head">
           <h2 className="p-section__title">
-            <Icon name="bolt" size={20} /> SmartFill
+            <Icon name="bolt" size={20} /> Créneaux libérés
           </h2>
-          <SimBadge />
+          <span className="muted" style={{ fontSize: 12 }}>
+            NOVIA cherche une cliente
+          </span>
         </div>
         {slots.length === 0 && <div className="card" style={{ padding: 18, fontSize: 14 }}>Aucun créneau libéré pour l’instant.</div>}
         <div className="grid-2">
@@ -81,21 +82,20 @@ export function Novia() {
 
       <section className="p-section">
         <div className="p-section__head">
-          <h2 className="p-section__title">No-show recovery</h2>
+          <h2 className="p-section__title">
+            <Icon name="refresh" size={20} /> Absences et annulations
+          </h2>
+          <span className="muted" style={{ fontSize: 12 }}>
+            NOVIA les récupère
+          </span>
         </div>
         <div className="stats" style={{ marginTop: 0 }}>
-          <StatTile label="No-shows (30 j)" value={recentNoShows.length} />
-          <StatTile label="Récupérés" value={recovered} />
-          <StatTile label="Valeur potentielle" value={formatEUR(nsPotential)} hint="CA potentiel, non réservé" />
-          <StatTile label="Depuis le" value={monthStart.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} hint="début du mois" />
+          <StatTile label="Absences (30 j)" value={recentNoShows.length} />
+          <StatTile label="Absences récupérées" value={recovered} />
+          <StatTile label="Encore à récupérer" value={formatEUR(nsPotential)} hint="potentiel, pas encore réservé" />
+          <StatTile label="Suivis en cours" value={runs.filter((r) => r.state === 'active' || r.state === 'paused').length} hint="absences et annulations" />
         </div>
-      </section>
-
-      <section className="p-section">
-        <div className="p-section__head">
-          <h2 className="p-section__title">Récupérations W03 / W04</h2>
-        </div>
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
           {runs.map((r) => (
             <div key={r.id}>
               <RunCard run={r} customer={byId(r.customerId)} compact={r.state !== 'active' && r.state !== 'paused'} />
@@ -139,10 +139,10 @@ function SlotCard({ o, result, customers, onLaunch }: { o: Opportunity; result?:
     <article className={`card novia-card ${o.status === 'open' ? 'novia-card--dark' : ''}`}>
       <div className="novia-card__row">
         <span className="eyebrow" style={o.status === 'open' ? { color: 'rgba(244,239,233,.6)' } : undefined}>
-          {o.status === 'open' ? 'Créneau libre' : 'Créneau rempli'}
+          {o.status === 'open' ? 'Créneau libre · NOVIA cherche une cliente' : o.status === 'won' ? 'Créneau rempli par NOVIA' : 'Gardé libre'}
         </span>
         <span className="muted" style={{ fontSize: 13 }}>
-          {o.slotDurationMin} min
+          {o.slotDurationMin} min · {formatEUR(o.amount)}
         </span>
       </div>
       <div className="novia-card__title">
@@ -150,7 +150,7 @@ function SlotCard({ o, result, customers, onLaunch }: { o: Opportunity; result?:
       </div>
       {o.status === 'open' ? (
         <button className="btn btn--light btn--sm" style={{ justifySelf: 'start' }} onClick={onLaunch}>
-          <Icon name="bolt" size={16} /> Lancer SmartFill
+          <Icon name="bolt" size={16} /> Remplir ce créneau
         </button>
       ) : (
         <div className="run__result">
@@ -188,7 +188,7 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
   return (
     <Sheet open onClose={close} label="SmartFill">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className="eyebrow">SmartFill</span>
+        <span className="eyebrow">Créneau libéré · NOVIA SmartFill</span>
         <SimBadge />
       </div>
       <h2 className="display" style={{ fontSize: 32, margin: '8px 0 4px' }}>
@@ -205,7 +205,7 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
             absence d’opposition et de reprise humaine. La première qui réserve récupère le créneau.
           </p>
           <button className="btn btn--lacquer btn--block" onClick={launch}>
-            <Icon name="bolt" size={18} /> Lancer SmartFill
+            <Icon name="bolt" size={18} /> Proposer ce créneau
           </button>
           <button
             className="btn btn--ghost btn--block"

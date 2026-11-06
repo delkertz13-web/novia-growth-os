@@ -5,14 +5,14 @@ import { appointmentEnd, attendanceState, outcomeLabels } from '../core/appointm
 import type { Appointment, Customer, ValidationOutcome, WorkflowRun } from '../core/types'
 import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Sheet, SimBadge, StatusPill } from '../ui/common'
+import { capitalize, fmt, Sheet, StatusPill } from '../ui/common'
 
 export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : '—')
 
 /* ---------------- Ligne de rendez-vous ---------------- */
 
 /** origine visible dans l'agenda quand NOVIA a obtenu le rendez-vous */
-const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'SmartFill', recovery: 'Récupération' }
+const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'Créneau rempli', recovery: 'Récupérée' }
 
 export function AppointmentRow({ a, customer, now, highlight }: { a: Appointment; customer?: Customer; now: Date; highlight?: boolean }) {
   const s = serviceById(a.serviceId)
@@ -127,16 +127,16 @@ export function ReschedulePicker({
 /* ---------------- Séquence W03 / W04 ---------------- */
 
 const wfTitles: Record<string, string> = {
-  W03: 'Annulation → récupération',
-  W04: 'No-show → récupération',
+  W03: 'NOVIA récupère une annulation',
+  W04: 'NOVIA récupère une absence',
 }
 
 const outcomeText: Record<string, string> = {
-  recovered: 'Récupérée : nouveau rendez-vous réservé (→ W02).',
-  no_response: 'Aucune réponse : séquence terminée.',
-  declined: 'Refus de la cliente : séquence terminée.',
-  obsolete: 'Statut corrigé : séquence devenue obsolète.',
-  stopped: 'Séquence stoppée par un contrôle.',
+  recovered: 'Récupérée : elle a repris rendez-vous.',
+  no_response: 'Pas de réponse : NOVIA s’est arrêtée.',
+  declined: 'Elle ne souhaite pas reprendre rendez-vous : NOVIA s’est arrêtée.',
+  obsolete: 'Statut corrigé : plus rien à récupérer.',
+  stopped: 'NOVIA s’est arrêtée après vérification.',
 }
 
 export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; customer?: Customer; compact?: boolean }) {
@@ -150,12 +150,11 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
     <article className="card run">
       <div className="run__head">
         <div>
-          <div className="run__wf">{run.workflow}</div>
+          <div className={`run__wf run__wf--${run.state}`}>{run.state === 'active' ? 'En cours' : run.state === 'paused' ? 'En pause' : run.outcome === 'recovered' ? 'Réussie' : 'Terminée'}</div>
           <div className="run__title">
             {wfTitles[run.workflow] ?? run.workflow} · {customerName(customer)}
           </div>
         </div>
-        <SimBadge />
       </div>
       <ol className="steps">
         {actions.map((x, i) => (

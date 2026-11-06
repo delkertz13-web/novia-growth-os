@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { attendanceState, statusLabels } from '../core/appointmentStatus'
 import type { Appointment } from '../core/types'
 import { novia } from '../domain'
@@ -41,34 +41,9 @@ export const sameDay = (a: Date, b: Date) =>
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-/* ---------------- Bandeau démo ---------------- */
+/* ---------------- Bandeau démo : voir ./demo.tsx ---------------- */
 
-export function DemoBanner() {
-  const { pathname } = useLocation()
-  const isPro = pathname.startsWith('/pro')
-  const onReset = () => {
-    if (window.confirm('Réinitialiser la démonstration ? Toutes les actions effectuées seront effacées.')) novia.demo?.reset()
-  }
-  return (
-    <div className="demo-banner" role="note" aria-label="Démonstration NOVIA — données fictives">
-      <div className="wrap demo-banner__row">
-        <span className="demo-banner__tag">DÉMO</span>
-        <span className="demo-banner__text">Démonstration NOVIA — données fictives</span>
-        <nav className="demo-banner__switch" aria-label="Changer d’espace">
-          <Link to="/" viewTransition className={!isPro ? 'is-active' : ''}>
-            Cliente
-          </Link>
-          <Link to="/pro" viewTransition className={isPro ? 'is-active' : ''}>
-            Pro
-          </Link>
-        </nav>
-        <button className="demo-banner__reset" onClick={onReset} aria-label="Réinitialiser la démo" title="Réinitialiser la démo">
-          <Icon name="refresh" size={16} />
-        </button>
-      </div>
-    </div>
-  )
-}
+export { DemoBanner } from './demo'
 
 /* ---------------- Badges ---------------- */
 

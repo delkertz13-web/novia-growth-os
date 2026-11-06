@@ -62,7 +62,7 @@ export function reactionFor(
     case 'present':
       steps.push(
         { key: 'status', tone: 'status', label: 'Présence enregistrée', detail: `Statut appliqué au rendez-vous ${before.ref}.` },
-        { key: 'novia', tone: 'calm', label: 'NOVIA clôt le suivi', detail: 'Plus de rappel pour ce rendez-vous. Satisfaction (W05) : à concevoir, rien n’est préparé.' },
+        { key: 'novia', tone: 'calm', label: 'NOVIA clôt le suivi', detail: 'Plus de rappel pour ce rendez-vous.' },
         { key: 'money', tone: 'money', label: 'Revenu', amount: before.price, amountLabel: 'en CA réservé', detail: 'Il passera en CA confirmé avec une preuve de paiement.' },
       )
       break
@@ -73,7 +73,7 @@ export function reactionFor(
         steps.push({
           key: 'novia',
           tone: 'novia',
-          label: 'NOVIA Recovery démarre',
+          label: 'NOVIA récupère cette absence',
           detail: `Dans ${rules.w04.waitBeforeRecoveryHours} h, un message bienveillant pour proposer un nouveau créneau (simulé).`,
         })
       else steps.push({ key: 'novia', tone: 'calm', label: 'NOVIA reste en retrait', detail: run?.actions.at(-1)?.label ?? 'Aucune relance prévue.' })
@@ -87,13 +87,13 @@ export function reactionFor(
           key: 'slot',
           tone: 'slot',
           label: 'Créneau libéré',
-          detail: `${shortSlot(smartfill.slotStart)} · ${smartfill.slotDurationMin ?? before.durationMin} min · SmartFill peut le proposer.`,
+          detail: `${shortSlot(smartfill.slotStart)} · ${smartfill.slotDurationMin ?? before.durationMin} min · NOVIA peut le proposer à une cliente.`,
         })
       if (run?.state === 'active')
         steps.push({
           key: 'novia',
           tone: 'novia',
-          label: 'NOVIA Recovery démarre',
+          label: 'NOVIA récupère cette annulation',
           detail: `Dans ${rules.w03.waitBeforeRecoveryHours} h, un message pour reprendre rendez-vous (simulé).`,
         })
       else if (run) steps.push({ key: 'novia', tone: 'calm', label: 'Pas de relance', detail: run.actions.at(-1)?.label })

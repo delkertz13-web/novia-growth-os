@@ -79,14 +79,14 @@ export function AppointmentDetail() {
           <dd>{originLabels[a.bookingOrigin]}</dd>
           <dt>Attribution</dt>
           <dd>{sourceLabels[a.attribution]}</dd>
-          <dt>No-shows (30 j / 90 j / total)</dt>
+          <dt>Absences (30 j / 90 j / total)</dt>
           <dd>
             {counts.d30} / {counts.d90} / {counts.total}
           </dd>
           {c?.noShowRecovered && (
             <>
-              <dt>NO_SHOW_RECOVERED</dt>
-              <dd>TRUE</dd>
+              <dt>Absence déjà récupérée</dt>
+              <dd>Oui</dd>
             </>
           )}
         </dl>

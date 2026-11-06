@@ -11,10 +11,10 @@ export const levelLabels: Record<RevenueLevel, string> = {
 export const sourceLabels: Record<AttributionSource, string> = {
   acquisition: 'Acquisition',
   cancellation_recovery: 'Annulations récupérées',
-  noshow_recovery: 'No-shows récupérés',
+  noshow_recovery: 'Absences récupérées',
   reactivation: 'Réactivation',
   referral: 'Parrainage',
-  smartfill: 'SmartFill',
+  smartfill: 'Créneaux remplis',
   voice: 'NOVIA Voice',
   direct: 'Sans action NOVIA',
 }

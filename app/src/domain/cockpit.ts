@@ -95,7 +95,7 @@ export function buildFeed(snap: Pick<NoviaSnapshot, 'runs' | 'messages' | 'custo
     }))
   const fromSmartFill = (snap.appointments ?? [])
     .filter((a) => a.bookingOrigin === 'smartfill' && a.bookedAt)
-    .map((a): FeedItem => ({ id: `sf-${a.id}`, at: a.bookedAt!, kind: 'win', label: 'SmartFill a rempli un créneau libéré (simulé)', who: byId(a.customerId)?.firstName, appointmentId: a.id }))
+    .map((a): FeedItem => ({ id: `sf-${a.id}`, at: a.bookedAt!, kind: 'win', label: 'NOVIA a rempli un créneau libéré (simulé)', who: byId(a.customerId)?.firstName, appointmentId: a.id }))
   return [...fromRuns, ...fromMessages, ...fromCalls, ...fromSmartFill].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit)
 }
 

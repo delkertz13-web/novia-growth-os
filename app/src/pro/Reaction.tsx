@@ -74,7 +74,7 @@ export function ReactionLinks({ reaction, onNavigate }: { reaction: Reaction; on
     <div className="rx-links">
       {reaction.smartfillId && (
         <Link className="btn btn--lacquer btn--sm" to={`/pro/novia?smartfill=${reaction.smartfillId}`} onClick={onNavigate}>
-          <Icon name="bolt" size={15} /> Lancer SmartFill
+          <Icon name="bolt" size={15} /> Remplir ce créneau
         </Link>
       )}
       {reaction.runId && (

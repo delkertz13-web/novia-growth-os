@@ -75,8 +75,8 @@ describe('Messages : NOVIA ↔ professionnelle', () => {
   it('la boîte de réception met en tête ce qui attend une réponse humaine', () => {
     const inbox = novia.pro.inbox()
     expect(inbox[0].state).toBe('needs_human')
-    expect(inbox.filter((i) => i.state === 'needs_human')).toHaveLength(2)
-    expect(novia.pro.cockpit(now()).needsReply).toHaveLength(2)
+    expect(inbox.filter((i) => i.state === 'needs_human')).toHaveLength(3)
+    expect(novia.pro.cockpit(now()).needsReply).toHaveLength(3)
   })
 
   it('question FAQ : NOVIA répond seule ; question inconnue : intervention de Léa', () => {
@@ -102,7 +102,7 @@ describe('Messages : NOVIA ↔ professionnelle', () => {
     expect(novia.pro.customerFile(oceane.id, now())!.segments).toContain('human')
     ok(novia.pro.letNoviaHandle(oceane.id))
     expect(run().state).toBe('active')
-    expect(run().actions.at(-1)!.label).toMatch(/revérification/i)
+    expect(run().actions.at(-1)!.label).toMatch(/vérification/i)
   })
 
   it('répondre soi-même vaut reprise humaine ; NOVIA ne répond plus à cette cliente', () => {
@@ -185,7 +185,7 @@ describe('SmartFill → fiche cliente', () => {
     const file = novia.pro.customerFile(res.customer.id, now())!
     expect(file.upcoming?.attribution).toBe('smartfill')
     const tl = novia.pro.timeline(res.customer.id, now())
-    expect(tl.history.some((e) => e.kind === 'booked' && e.byNovia && e.detail?.includes('SmartFill'))).toBe(true)
+    expect(tl.history.some((e) => e.kind === 'booked' && e.byNovia && e.detail?.includes('Créneau rempli'))).toBe(true)
   })
 })
 
