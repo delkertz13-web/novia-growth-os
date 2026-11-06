@@ -102,7 +102,10 @@ a.avatar {
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--dur-2), color var(--dur-2), border-color var(--dur-2);
+  transition:
+    background var(--dur-2),
+    color var(--dur-2),
+    border-color var(--dur-2);
 }
 .ops-chip.is-active {
   background: var(--ink);
@@ -193,7 +196,7 @@ a.avatar {
   white-space: nowrap;
 }
 .ops-row.is-unread .ops-row__title::after {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -259,7 +262,7 @@ a.avatar {
   color: var(--sage);
 }
 .ops-state::before {
-  content: '';
+  content: "";
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -431,7 +434,7 @@ a.avatar {
   position: relative;
 }
 .tl::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 15px;
   top: 14px;
@@ -440,7 +443,11 @@ a.avatar {
   background: var(--line-strong);
 }
 .tl--future::before {
-  background: repeating-linear-gradient(to bottom, var(--line-strong) 0 4px, transparent 4px 8px);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--line-strong) 0 4px,
+    transparent 4px 8px
+  );
 }
 .tl__row {
   position: relative;
@@ -833,7 +840,7 @@ a.avatar {
   transition: background var(--dur-2) var(--ease-out);
 }
 .switch::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 3px;
   left: 3px;

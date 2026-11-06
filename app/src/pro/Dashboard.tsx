@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { serviceById } from '../config/services.demo'
-import { appointmentEnd } from '../core/appointmentStatus'
-import { formatEUR } from '../core/revenue'
-import type { Appointment } from '../core/types'
-import { customerName, kpiDefinitions, novia, sameDay, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
-import { Icon } from '../ui/Icon'
-import { Counter } from '../ui/motion/Counter'
-import { useReducedMotion } from '../ui/motion'
-import { capitalize, fmt, Sheet, useDemoState, useNow } from '../ui/common'
-import { OutcomeButtons } from './parts'
-import { ReactionLinks, ReactionSteps } from './Reaction'
-import { useValidation } from './Validation'
-import './cockpit.css'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { business } from "../config/business.demo";
+import { serviceById } from "../config/services.demo";
+import { appointmentEnd } from "../core/appointmentStatus";
+import { formatEUR } from "../core/revenue";
+import type { Appointment } from "../core/types";
+import {
+  customerName,
+  kpiDefinitions,
+  novia,
+  sameDay,
+  type FeedItem,
+  type Reaction,
+  type TodayItem,
+  type TodayState,
+} from "../domain";
+import { Icon } from "../ui/Icon";
+import { Counter } from "../ui/motion/Counter";
+import { useReducedMotion } from "../ui/motion";
+import { capitalize, fmt, Sheet, useDemoState, useNow } from "../ui/common";
+import { OutcomeButtons } from "./parts";
+import { ReactionLinks, ReactionSteps } from "./Reaction";
+import { useValidation } from "./Validation";
+import "./cockpit.css";
 
 /**
  * Cockpit NOVIA Pro. Lit une vue construite par le domaine (novia.pro.cockpit) et
@@ -22,32 +31,48 @@ import './cockpit.css'
  * compteurs du haut se mettent à jour.
  */
 export function Dashboard() {
-  const st = useDemoState()
-  const now = useNow()
-  const view = useMemo(() => novia.pro.cockpit(now), [st, now])
-  const reduce = useReducedMotion()
+  const st = useDemoState();
+  const now = useNow();
+  const view = useMemo(() => novia.pro.cockpit(now), [st, now]);
+  const reduce = useReducedMotion();
 
   // Réactions en cours d'affichage : la carte reste visible après la décision.
-  const [held, setHeld] = useState<{ before: Appointment; reaction: Reaction; leaving?: boolean }[]>([])
-  const onReaction = useCallback((reaction: Reaction, before: Appointment) => setHeld((h) => [...h.filter((x) => x.before.id !== before.id), { before, reaction }]), [])
-  const { pick, ui } = useValidation(onReaction)
+  const [held, setHeld] = useState<
+    { before: Appointment; reaction: Reaction; leaving?: boolean }[]
+  >([]);
+  const onReaction = useCallback(
+    (reaction: Reaction, before: Appointment) =>
+      setHeld((h) => [
+        ...h.filter((x) => x.before.id !== before.id),
+        { before, reaction },
+      ]),
+    [],
+  );
+  const { pick, ui } = useValidation(onReaction);
   const dismiss = (id: string) => {
-    if (reduce) return setHeld((h) => h.filter((x) => x.before.id !== id))
-    setHeld((h) => h.map((x) => (x.before.id === id ? { ...x, leaving: true } : x)))
-    window.setTimeout(() => setHeld((h) => h.filter((x) => x.before.id !== id)), 420)
-  }
+    if (reduce) return setHeld((h) => h.filter((x) => x.before.id !== id));
+    setHeld((h) =>
+      h.map((x) => (x.before.id === id ? { ...x, leaving: true } : x)),
+    );
+    window.setTimeout(
+      () => setHeld((h) => h.filter((x) => x.before.id !== id)),
+      420,
+    );
+  };
 
   const actions = [
-    ...view.toConfirm.filter((a) => !held.some((h) => h.before.id === a.id)).map((a) => ({ a, h: undefined })),
+    ...view.toConfirm
+      .filter((a) => !held.some((h) => h.before.id === a.id))
+      .map((a) => ({ a, h: undefined })),
     ...held.map((h) => ({ a: h.before, h })),
-  ].sort((x, y) => y.a.start.localeCompare(x.a.start))
+  ].sort((x, y) => y.a.start.localeCompare(x.a.start));
 
-  const byId = (id: string) => st.customers.find((c) => c.id === id)
-  const pulse = usePulse(st)
-  const runs = view.recoveries.active.length
-  const rev = view.revenue
-  const [how, setHow] = useState(false)
-  const slots = view.freedSlots.length
+  const byId = (id: string) => st.customers.find((c) => c.id === id);
+  const pulse = usePulse(st);
+  const runs = view.recoveries.active.length;
+  const rev = view.revenue;
+  const [how, setHow] = useState(false);
+  const slots = view.freedSlots.length;
 
   return (
     <main className="wrap page ck">
@@ -55,7 +80,9 @@ export function Dashboard() {
         <div>
           <div className="ck-head__date">
             {capitalize(fmt.dayLong(now))}
-            {novia.clockMode === 'demo' && <span className="ck-head__clock"> · {fmt.time(now)} (démo)</span>}
+            {novia.clockMode === "demo" && (
+              <span className="ck-head__clock"> · {fmt.time(now)} (démo)</span>
+            )}
           </div>
           <h1 className="display">Bonjour {business.artistFirstName.value}</h1>
         </div>
@@ -68,8 +95,8 @@ export function Dashboard() {
         <span className="ck-pulse__dot" key={pulse} aria-hidden="true" />
         <span>
           NOVIA veille
-          {runs > 0 && ` · ${runs} récupération${runs > 1 ? 's' : ''} en cours`}
-          {slots > 0 && ` · ${slots} créneau${slots > 1 ? 'x' : ''} à remplir`}
+          {runs > 0 && ` · ${runs} récupération${runs > 1 ? "s" : ""} en cours`}
+          {slots > 0 && ` · ${slots} créneau${slots > 1 ? "x" : ""} à remplir`}
         </span>
       </p>
 
@@ -77,7 +104,10 @@ export function Dashboard() {
         <div className="ck-panel__main">
           <span className="ck-label">CA du jour</span>
           <span className="ck-big">
-            <Counter value={rev.todayBooked + rev.todayConfirmed} format={formatEUR} />
+            <Counter
+              value={rev.todayBooked + rev.todayConfirmed}
+              format={formatEUR}
+            />
           </span>
           <span className="ck-split">
             <span>
@@ -103,13 +133,17 @@ export function Dashboard() {
               <Counter value={rev.noviaWonThisMonth} format={formatEUR} />
             </span>
             <span className="ck-kpi__l">gagné par NOVIA ce mois</span>
-            <span className="ck-kpi__lv">dont {formatEUR(rev.noviaConfirmedThisMonth)} confirmé</span>
+            <span className="ck-kpi__lv">
+              dont {formatEUR(rev.noviaConfirmedThisMonth)} confirmé
+            </span>
           </Link>
           <Link to="/pro/novia" className="ck-kpi">
             <span className="ck-kpi__v">
               <Counter value={slots} />
             </span>
-            <span className="ck-kpi__l">créneau{slots > 1 ? 'x' : ''} libéré{slots > 1 ? 's' : ''}</span>
+            <span className="ck-kpi__l">
+              créneau{slots > 1 ? "x" : ""} libéré{slots > 1 ? "s" : ""}
+            </span>
             <span className="ck-kpi__lv">NOVIA cherche une cliente</span>
           </Link>
         </div>
@@ -117,19 +151,28 @@ export function Dashboard() {
           <Icon name="info" size={15} /> Comment sont calculés ces chiffres ?
         </button>
       </section>
-      <Sheet open={how} onClose={() => setHow(false)} label="Calcul des indicateurs">
+      <Sheet
+        open={how}
+        onClose={() => setHow(false)}
+        label="Calcul des indicateurs"
+      >
         <KpiHelp onClose={() => setHow(false)} />
       </Sheet>
 
       <section className="p-section" aria-labelledby="ck-actions">
         <div className="p-section__head">
           <h2 className="p-section__title" id="ck-actions">
-            Actions nécessaires {view.toConfirm.length > 0 && <span className="count">{view.toConfirm.length}</span>}
+            Actions nécessaires{" "}
+            {view.toConfirm.length > 0 && (
+              <span className="count">{view.toConfirm.length}</span>
+            )}
           </h2>
         </div>
         {actions.length === 0 ? (
           <div className="ck-calm">
-            <Icon name="check" size={16} /> Tout est à jour. NOVIA ne déduit jamais une présence de l’heure : les rendez-vous terminés apparaîtront ici.
+            <Icon name="check" size={16} /> Tout est à jour. NOVIA ne déduit
+            jamais une présence de l’heure : les rendez-vous terminés
+            apparaîtront ici.
           </div>
         ) : (
           <div className="ck-actions">
@@ -153,7 +196,8 @@ export function Dashboard() {
         <section className="p-section" aria-labelledby="ck-reply">
           <div className="p-section__head">
             <h2 className="p-section__title" id="ck-reply">
-              Messages à traiter <span className="count">{view.needsReply.length}</span>
+              Messages à traiter{" "}
+              <span className="count">{view.needsReply.length}</span>
             </h2>
             <Link to="/pro/messages" className="link-arrow">
               Messages <Icon name="arrowRight" size={16} />
@@ -161,7 +205,11 @@ export function Dashboard() {
           </div>
           <div className="ck-replies">
             {view.needsReply.map((i) => (
-              <Link key={i.conversation.id} to={`/pro/messages/${i.conversation.id}`} className="ck-reply">
+              <Link
+                key={i.conversation.id}
+                to={`/pro/messages/${i.conversation.id}`}
+                className="ck-reply"
+              >
                 <span className="ck-reply__who">
                   {customerName(i.customer)}
                   <span>{i.conversation.needsHumanReason}</span>
@@ -193,17 +241,24 @@ export function Dashboard() {
         </div>
         <div className="ck-novia">
           {view.freedSlots.slice(0, 1).map((o) => (
-            <Link key={o.id} to={`/pro/novia?smartfill=${o.id}`} className="ck-slot">
+            <Link
+              key={o.id}
+              to={`/pro/novia?smartfill=${o.id}`}
+              className="ck-slot"
+            >
               <span className="ck-label">
                 <Icon name="bolt" size={14} /> Créneau libéré
               </span>
               <span className="ck-slot__when">
-                {capitalize(fmt.dayShort(o.slotStart!))} · {fmt.time(o.slotStart!)}
+                {capitalize(fmt.dayShort(o.slotStart!))} ·{" "}
+                {fmt.time(o.slotStart!)}
               </span>
               <span className="ck-hint">
                 {o.slotDurationMin} min · {formatEUR(o.amount)} à récupérer
               </span>
-              <span className="btn btn--lacquer btn--sm">Remplir ce créneau</span>
+              <span className="btn btn--lacquer btn--sm">
+                Remplir ce créneau
+              </span>
             </Link>
           ))}
           <Link to="/pro/novia" className="ck-tile">
@@ -214,7 +269,8 @@ export function Dashboard() {
               <Counter value={runs} />
             </span>
             <span className="ck-hint">
-              en cours · {view.recoveries.recoveredThisMonth} réussie{view.recoveries.recoveredThisMonth > 1 ? 's' : ''} ce mois
+              en cours · {view.recoveries.recoveredThisMonth} réussie
+              {view.recoveries.recoveredThisMonth > 1 ? "s" : ""} ce mois
             </span>
           </Link>
           <Feed items={view.feed} now={now} />
@@ -222,21 +278,21 @@ export function Dashboard() {
       </section>
       {ui}
     </main>
-  )
+  );
 }
 
 /** Change de valeur à chaque changement d'état métier : le point du pouls clignote une fois. */
 function usePulse(st: unknown) {
-  const [n, setN] = useState(0)
-  const first = useRef(true)
+  const [n, setN] = useState(0);
+  const first = useRef(true);
   useEffect(() => {
     if (first.current) {
-      first.current = false
-      return
+      first.current = false;
+      return;
     }
-    setN((x) => x + 1)
-  }, [st])
-  return n
+    setN((x) => x + 1);
+  }, [st]);
+  return n;
 }
 
 /* ---------------- Carte d'action ---------------- */
@@ -250,24 +306,26 @@ function ActionCard({
   onPick,
   onDone,
 }: {
-  a: Appointment
-  customerName: string
-  now: Date
-  reaction?: Reaction
-  leaving?: boolean
-  onPick: Parameters<typeof OutcomeButtons>[0]['onPick']
-  onDone: () => void
+  a: Appointment;
+  customerName: string;
+  now: Date;
+  reaction?: Reaction;
+  leaving?: boolean;
+  onPick: Parameters<typeof OutcomeButtons>[0]["onPick"];
+  onDone: () => void;
 }) {
-  const s = serviceById(a.serviceId)
-  const [played, setPlayed] = useState(false)
-  const doneRef = useRef<HTMLButtonElement>(null)
+  const s = serviceById(a.serviceId);
+  const [played, setPlayed] = useState(false);
+  const doneRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (played) doneRef.current?.focus()
-  }, [played])
+    if (played) doneRef.current?.focus();
+  }, [played]);
 
   return (
-    <div className={`ck-collapse ${leaving ? 'is-leaving' : ''}`}>
-      <article className={`ck-card ${reaction ? `is-reacting is-${reaction.outcome}` : ''}`}>
+    <div className={`ck-collapse ${leaving ? "is-leaving" : ""}`}>
+      <article
+        className={`ck-card ${reaction ? `is-reacting is-${reaction.outcome}` : ""}`}
+      >
         <Link to={`/pro/rdv/${a.id}`} className="ck-card__top">
           <span className="ck-card__time">{fmt.time(a.start)}</span>
           <span className="ck-card__who">
@@ -277,7 +335,10 @@ function ActionCard({
             </span>
           </span>
           {reaction ? (
-            <span className={`ck-state ck-state--${reaction.outcome}`} key={reaction.outcome}>
+            <span
+              className={`ck-state ck-state--${reaction.outcome}`}
+              key={reaction.outcome}
+            >
               {reaction.stateLabel}
             </span>
           ) : (
@@ -287,10 +348,18 @@ function ActionCard({
 
         {reaction ? (
           <div className="ck-card__rx">
-            <ReactionSteps reaction={reaction} onPlayed={() => setPlayed(true)} />
-            <div className={`ck-card__after ${played ? 'is-on' : ''}`}>
+            <ReactionSteps
+              reaction={reaction}
+              onPlayed={() => setPlayed(true)}
+            />
+            <div className={`ck-card__after ${played ? "is-on" : ""}`}>
               <ReactionLinks reaction={reaction} />
-              <button ref={doneRef} type="button" className="btn btn--ghost btn--sm" onClick={onDone}>
+              <button
+                ref={doneRef}
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={onDone}
+              >
                 OK
               </button>
             </div>
@@ -299,31 +368,37 @@ function ActionCard({
           <>
             <p className="ck-card__q">
               Terminé à {fmt.time(appointmentEnd(a))}
-              {!sameDay(new Date(a.start), now) ? ` le ${fmt.dayShort(a.start)}` : ''}. Était-elle là ?
+              {!sameDay(new Date(a.start), now)
+                ? ` le ${fmt.dayShort(a.start)}`
+                : ""}
+              . Était-elle là ?
             </p>
             <OutcomeButtons a={a} now={now} onPick={onPick} />
           </>
         )}
       </article>
     </div>
-  )
+  );
 }
 
 /* ---------------- Journée ---------------- */
 
 const stateText: Record<TodayState, string> = {
-  done: 'Présente',
-  absent: 'Absente',
-  cancelled: 'Annulée',
-  to_confirm: 'À confirmer',
-  in_progress: 'En cours',
-  next: 'Prochaine',
-  upcoming: '',
-}
+  done: "Présente",
+  absent: "Absente",
+  cancelled: "Annulée",
+  to_confirm: "À confirmer",
+  in_progress: "En cours",
+  next: "Prochaine",
+  upcoming: "",
+};
 
 function TodayRail({ items, now }: { items: TodayItem[]; now: Date }) {
-  if (!items.length) return <div className="ck-calm">Aucun rendez-vous aujourd’hui.</div>
-  const nowIdx = items.findIndex((i) => new Date(i.appointment.start).getTime() > now.getTime())
+  if (!items.length)
+    return <div className="ck-calm">Aucun rendez-vous aujourd’hui.</div>;
+  const nowIdx = items.findIndex(
+    (i) => new Date(i.appointment.start).getTime() > now.getTime(),
+  );
   return (
     <ol className="ck-rail">
       {items.map((i, idx) => (
@@ -334,12 +409,15 @@ function TodayRail({ items, now }: { items: TodayItem[]; now: Date }) {
             </div>
           )}
           <Link to={`/pro/rdv/${i.appointment.id}`} className="ck-rail__row">
-            <span className="ck-rail__time">{fmt.time(i.appointment.start)}</span>
+            <span className="ck-rail__time">
+              {fmt.time(i.appointment.start)}
+            </span>
             <span className="ck-rail__dot" aria-hidden="true" />
             <span className="ck-rail__who">
               <strong>{customerName(i.customer)}</strong>
               <span>
-                {serviceById(i.appointment.serviceId)?.name} · {fmt.eur(i.appointment.price)}
+                {serviceById(i.appointment.serviceId)?.name} ·{" "}
+                {fmt.eur(i.appointment.price)}
               </span>
             </span>
             {stateText[i.state] && (
@@ -358,22 +436,22 @@ function TodayRail({ items, now }: { items: TodayItem[]; now: Date }) {
         </li>
       )}
     </ol>
-  )
+  );
 }
 
 /* ---------------- Activité ---------------- */
 
 const ago = (iso: string, now: Date) => {
-  const m = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000)
-  if (m < 1) return 'à l’instant'
-  if (m < 60) return `il y a ${m} min`
-  const h = Math.round(m / 60)
-  if (h < 24) return `il y a ${h} h`
-  return capitalize(fmt.dayShort(iso))
-}
+  const m = Math.round((now.getTime() - new Date(iso).getTime()) / 60_000);
+  if (m < 1) return "à l’instant";
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `il y a ${h} h`;
+  return capitalize(fmt.dayShort(iso));
+};
 
 function Feed({ items, now }: { items: FeedItem[]; now: Date }) {
-  if (!items.length) return null
+  if (!items.length) return null;
   return (
     <div className="ck-feed">
       <span className="ck-label">Dernières actions de NOVIA</span>
@@ -390,7 +468,7 @@ function Feed({ items, now }: { items: FeedItem[]; now: Date }) {
         ))}
       </ol>
     </div>
-  )
+  );
 }
 
 /* ---------------- Définitions des indicateurs ---------------- */
@@ -401,13 +479,16 @@ function KpiHelp({ onClose }: { onClose: () => void }) {
       <h2 className="display">Ces chiffres</h2>
       <p className="kpi-help__levels">
         <span>
-          <i className="lv lv--potential" /> Potentiel : peut encore être regagné.
+          <i className="lv lv--potential" /> Potentiel : peut encore être
+          regagné.
         </span>
         <span>
-          <i className="lv lv--booked" /> Réservé : un rendez-vous existe, rien n’est encaissé.
+          <i className="lv lv--booked" /> Réservé : un rendez-vous existe, rien
+          n’est encaissé.
         </span>
         <span>
-          <i className="lv lv--confirmed" /> Confirmé : prestation attestée et preuve de paiement.
+          <i className="lv lv--confirmed" /> Confirmé : prestation attestée et
+          preuve de paiement.
         </span>
       </p>
       <dl>
@@ -420,10 +501,13 @@ function KpiHelp({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </dl>
-      <p className="kpi-help__demo">Données de démonstration, entièrement fictives. Aucun montant n’est encaissé par NOVIA.</p>
+      <p className="kpi-help__demo">
+        Données de démonstration, entièrement fictives. Aucun montant n’est
+        encaissé par NOVIA.
+      </p>
       <button className="btn btn--ghost btn--block" onClick={onClose}>
         Fermer
       </button>
     </div>
-  )
+  );
 }

@@ -22,15 +22,18 @@
   --slate: #4c5866;
   --slate-soft: #e5e8ec;
 
-  --font-display: 'Fraunces Variable', 'Iowan Old Style', Georgia, serif;
-  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-ui:
+    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --r-sm: 10px;
   --r-md: 16px;
   --r-lg: 24px;
   --r-xl: 32px;
-  --shadow-1: 0 1px 2px rgba(29, 25, 22, 0.05), 0 4px 16px rgba(29, 25, 22, 0.05);
-  --shadow-2: 0 2px 6px rgba(29, 25, 22, 0.06), 0 18px 40px rgba(29, 25, 22, 0.1);
+  --shadow-1:
+    0 1px 2px rgba(29, 25, 22, 0.05), 0 4px 16px rgba(29, 25, 22, 0.05);
+  --shadow-2:
+    0 2px 6px rgba(29, 25, 22, 0.06), 0 18px 40px rgba(29, 25, 22, 0.1);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -42,9 +45,12 @@
 
   /* ---- V2 · Profondeur : 4 plans (scène, surface, carte flottante, premier plan) ---- */
   --elev-0: none;
-  --elev-1: 0 1px 1px rgba(29, 25, 22, 0.06), 0 2px 8px -2px rgba(29, 25, 22, 0.08);
-  --elev-2: 0 1px 2px rgba(29, 25, 22, 0.08), 0 10px 28px -10px rgba(29, 25, 22, 0.22);
-  --elev-3: 0 2px 4px rgba(12, 9, 8, 0.12), 0 24px 56px -18px rgba(12, 9, 8, 0.45);
+  --elev-1:
+    0 1px 1px rgba(29, 25, 22, 0.06), 0 2px 8px -2px rgba(29, 25, 22, 0.08);
+  --elev-2:
+    0 1px 2px rgba(29, 25, 22, 0.08), 0 10px 28px -10px rgba(29, 25, 22, 0.22);
+  --elev-3:
+    0 2px 4px rgba(12, 9, 8, 0.12), 0 24px 56px -18px rgba(12, 9, 8, 0.45);
   --perspective: 1200px;
 
   /* ---- V2 · Scènes « atelier » (accueil, galerie, réalisation ouverte) ---- */
@@ -68,7 +74,19 @@
 /* Ressort léger (dépassement ~4 %) pour les objets que l'on pose. Safari 17.2+. */
 @supports (transition-timing-function: linear(0, 1)) {
   :root {
-    --ease-spring: linear(0, 0.06 3%, 0.25 8%, 0.53 15%, 0.8 23%, 0.97 32%, 1.03 40%, 1.04 47%, 1.02 58%, 1 72%, 1);
+    --ease-spring: linear(
+      0,
+      0.06 3%,
+      0.25 8%,
+      0.53 15%,
+      0.8 23%,
+      0.97 32%,
+      1.03 40%,
+      1.04 47%,
+      1.02 58%,
+      1 72%,
+      1
+    );
   }
 }
 
@@ -120,7 +138,9 @@ a {
   font-weight: 380;
   letter-spacing: -0.02em;
   line-height: 1.02;
-  font-variation-settings: 'opsz' 144, 'SOFT' 50;
+  font-variation-settings:
+    "opsz" 144,
+    "SOFT" 50;
 }
 
 .eyebrow {
@@ -256,7 +276,7 @@ a {
   white-space: nowrap;
 }
 .pill::before {
-  content: '';
+  content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -303,7 +323,11 @@ a {
   letter-spacing: 0.01em;
   text-decoration: none;
   cursor: pointer;
-  transition: transform 0.25s var(--ease), background 0.25s, box-shadow 0.25s, opacity 0.2s;
+  transition:
+    transform 0.25s var(--ease),
+    background 0.25s,
+    box-shadow 0.25s,
+    opacity 0.2s;
   user-select: none;
 }
 .btn:active {
@@ -420,7 +444,7 @@ a {
   background: var(--tone, var(--shell));
 }
 .photo--media::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: var(--lqip) var(--focal, 50% 50%) / cover no-repeat;
@@ -462,7 +486,11 @@ a {
 }
 .photo--ph {
   background:
-    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(
+      120% 90% at 30% 20%,
+      rgba(255, 255, 255, 0.55),
+      transparent 60%
+    ),
     linear-gradient(160deg, #e9e0d6, #d9cdc1);
 }
 .photo__ph-label {
@@ -512,7 +540,10 @@ a {
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
 }
 .chip.is-active {
   background: var(--ink);
@@ -646,7 +677,11 @@ a {
 }
 .scene .photo--ph {
   background:
-    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.08), transparent 60%),
+    radial-gradient(
+      120% 90% at 30% 20%,
+      rgba(255, 255, 255, 0.08),
+      transparent 60%
+    ),
     linear-gradient(160deg, var(--scene-2), var(--scene));
 }
 .scene .photo__ph-label,
@@ -667,7 +702,9 @@ a {
   backdrop-filter: blur(18px) saturate(1.2);
 }
 .pressable {
-  transition: transform var(--dur-1) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
 }
 .pressable:active {
   transform: scale(0.98);
@@ -715,7 +752,9 @@ a {
   font: inherit;
   font-size: 16px; /* évite le zoom iOS */
   color: var(--ink);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 .field input:focus {
   outline: none;
@@ -761,7 +800,7 @@ button.demo-banner__tag {
 /* zones tactiles élargies sans grossir le bandeau */
 button.demo-banner__tag::before,
 .demo-banner__switch a::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -11px -4px;
 }
@@ -844,7 +883,7 @@ button.demo-banner__tag::before,
   cursor: pointer;
 }
 .demo-switch::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 3px;
   left: 3px;
@@ -910,7 +949,7 @@ button.demo-banner__tag::before,
   position: relative;
 }
 .pres__nav::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -4px;
 }
@@ -940,7 +979,7 @@ button.demo-banner__tag::before,
 .ops-tag::before,
 .chip::before,
 .hero2__more::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -8px 0;
 }

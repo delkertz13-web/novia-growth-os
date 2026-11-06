@@ -52,7 +52,7 @@
   background: var(--sage);
 }
 .ck-pulse__dot::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: -5px;
   border-radius: 50%;
@@ -79,8 +79,16 @@
   padding: 20px 20px 6px;
   border-radius: var(--r-xl);
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(142, 52, 57, 0.32), transparent 55%),
-    linear-gradient(180deg, rgba(244, 239, 233, 0.07), rgba(244, 239, 233, 0.025));
+    radial-gradient(
+      120% 90% at 100% 0%,
+      rgba(142, 52, 57, 0.32),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(244, 239, 233, 0.07),
+      rgba(244, 239, 233, 0.025)
+    );
   border: 1px solid rgba(244, 239, 233, 0.1);
   box-shadow:
     0 1px 0 rgba(244, 239, 233, 0.08) inset,
@@ -107,7 +115,7 @@
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  font-variation-settings: 'opsz' 144;
+  font-variation-settings: "opsz" 144;
   margin-top: 6px;
 }
 .ck-hint {
@@ -206,12 +214,16 @@
     transform var(--dur-3) var(--ease-spring);
 }
 .ck-card::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(90% 70% at 0% 0%, var(--glow, transparent), transparent 70%);
+  background: radial-gradient(
+    90% 70% at 0% 0%,
+    var(--glow, transparent),
+    transparent 70%
+  );
   transition: opacity var(--dur-4) var(--ease-out);
 }
 .ck-card.is-reacting {
@@ -319,7 +331,7 @@
   animation: ck-state-in var(--dur-3) var(--ease-spring) both;
 }
 .ck-state::before {
-  content: '';
+  content: "";
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -380,7 +392,7 @@
 }
 /* fil entre deux étapes : il se trace quand l'étape s'allume */
 .rx__step:not(:last-child)::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 12.5px;
   top: 28px;
@@ -500,13 +512,17 @@
   position: relative;
 }
 .ck-rail::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 61px;
   top: 14px;
   bottom: 14px;
   width: 1px;
-  background: linear-gradient(var(--line-strong), var(--line-strong) 80%, transparent);
+  background: linear-gradient(
+    var(--line-strong),
+    var(--line-strong) 80%,
+    transparent
+  );
 }
 .ck-rail__row {
   position: relative;
@@ -581,7 +597,12 @@
   border-color: var(--slate);
 }
 .ck-rail__item.is-next .ck-rail__row {
-  background: linear-gradient(90deg, rgba(176, 72, 78, 0.16), rgba(176, 72, 78, 0.04) 70%, transparent);
+  background: linear-gradient(
+    90deg,
+    rgba(176, 72, 78, 0.16),
+    rgba(176, 72, 78, 0.04) 70%,
+    transparent
+  );
 }
 .ck-rail__item.is-next .ck-rail__dot {
   width: 13px;
@@ -610,14 +631,14 @@
   font-variant-numeric: tabular-nums;
 }
 .ck-now::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
   margin-left: 9px;
   background: linear-gradient(90deg, #e8968b, rgba(232, 150, 139, 0));
 }
 .ck-now::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 58px;
   width: 7px;
@@ -654,7 +675,11 @@
 }
 .ck-slot {
   background:
-    radial-gradient(100% 120% at 100% 0%, rgba(176, 72, 78, 0.38), transparent 60%),
+    radial-gradient(
+      100% 120% at 100% 0%,
+      rgba(176, 72, 78, 0.38),
+      transparent 60%
+    ),
     linear-gradient(160deg, #2b1718, #1b1312);
   border-color: rgba(236, 138, 125, 0.18);
 }
