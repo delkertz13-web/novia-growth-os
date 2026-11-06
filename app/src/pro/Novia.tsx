@@ -9,6 +9,11 @@ import { Icon } from '../ui/Icon'
 import { capitalize, fmt, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
 import { customerName, RunCard, StatTile } from './parts'
 
+const dayKey = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function Novia() {
   const st = useDemoState()
   const now = useNow()
@@ -49,7 +54,7 @@ export function Novia() {
         </Link>
         <Link to="/pro/revenue" className="hub__tile">
           <Icon name="chart" size={20} />
-          <strong>Revenue</strong>
+          <strong>Revenus</strong>
           <span>{formatEUR(won)} gagnés ce mois</span>
         </Link>
         <Link to="/pro/reglages" className="hub__tile">
@@ -165,10 +170,12 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
   const [phase, setPhase] = useState<'intro' | 'running' | 'done'>('intro')
   const [snapshot, setSnapshot] = useState<SmartFillFunnel | null>(null)
   const [winner, setWinner] = useState<Customer | null>(null)
+  const [booked, setBooked] = useState<Appointment | null>(null)
   const close = () => {
     setPhase('intro')
     setSnapshot(null)
     setWinner(null)
+    setBooked(null)
     onClose()
   }
   if (!id || !o?.slotStart) return null
@@ -180,7 +187,10 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
     setPhase('running')
     setTimeout(() => {
       const r = novia.pro.launchSmartFill(o.id)
-      if (r.ok && r.value) setWinner(r.value.customer)
+      if (r.ok && r.value) {
+        setWinner(r.value.customer)
+        setBooked(r.value.appointment)
+      }
       setPhase('done')
     }, 1600)
   }
@@ -236,11 +246,18 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
       {phase === 'done' && winner && (
         <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
           <div className="run__result">
-            {customerName(winner)} a réservé le créneau (simulé). {formatEUR(o.amount)} passent de « potentiel » à « réservé ».
+            {customerName(winner)} a pris le créneau (simulé). Le trou est comblé : {formatEUR(o.amount)} passent de « à récupérer » à « réservé ».
           </div>
-          <Link to="/pro/revenue" className="btn btn--primary" onClick={close}>
-            Voir l’attribution du revenu <Icon name="arrowRight" size={18} />
-          </Link>
+          <div className="sf-links">
+            {booked && (
+              <Link to={`/pro/agenda?jour=${dayKey(booked.start)}&rdv=${booked.id}`} className="btn btn--ghost" onClick={close}>
+                <Icon name="calendar" size={17} /> Dans l’agenda
+              </Link>
+            )}
+            <Link to="/pro/revenue" className="btn btn--primary" onClick={close}>
+              Voir le revenu <Icon name="arrowRight" size={18} />
+            </Link>
+          </div>
         </div>
       )}
       {phase === 'done' && !winner && <div className="run__result run__result--neutral" style={{ marginTop: 16 }}>Aucune cliente contactable : le créneau reste libre.</div>}

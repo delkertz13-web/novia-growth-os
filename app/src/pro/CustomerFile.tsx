@@ -159,7 +159,7 @@ export function CustomerFile() {
           <dd>{fmt.eur(amounts.confirmed)}</dd>
         </div>
         <div>
-          <dt>No-shows · annulations</dt>
+          <dt>Absences · annulations</dt>
           <dd>
             {noShows.total} · {cancellations}
           </dd>

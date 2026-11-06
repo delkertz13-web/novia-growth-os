@@ -7,7 +7,7 @@ import { fmt, useDemoState, useNow } from '../ui/common'
 const segmentOrder: Segment[] = ['active', 'to_follow_up', 'refill', 'new_lead', 'recent_no_show', 'human']
 /** pastille affichée sur la ligne : la plus utile d'abord */
 const tagPriority: Segment[] = ['human', 'recent_no_show', 'to_follow_up', 'refill', 'new_lead']
-const tagShort: Record<Segment, string> = { active: 'Active', to_follow_up: 'À relancer', refill: 'Remplissage', new_lead: 'Nouveau', recent_no_show: 'No-show', human: 'Reprise' }
+const tagShort: Record<Segment, string> = { active: 'Active', to_follow_up: 'À relancer', refill: 'Remplissage', new_lead: 'Nouveau', recent_no_show: 'Absence', human: 'Reprise' }
 
 /** Trouver une cliente en deux secondes, ou voir qui demande de l'attention. */
 export function Customers() {

@@ -36,7 +36,9 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --gutter: 20px;
   --maxw: 1120px;
-  --banner-h: 34px;
+  /* hauteur de la ligne DÉMO (cibles tactiles 44 px) ; --banner-h = bandeau complet, mesuré (mode présentation compris) */
+  --banner-row: 44px;
+  --banner-h: 44px;
 
   /* ---- V2 · Profondeur : 4 plans (scène, surface, carte flottante, premier plan) ---- */
   --elev-0: none;
@@ -160,7 +162,7 @@ a {
   color: #f4efe9;
 }
 .demo-banner__row {
-  height: var(--banner-h);
+  height: var(--banner-row);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -336,7 +338,7 @@ a {
   border-color: rgba(244, 239, 233, 0.45);
 }
 .btn--sm {
-  --h: 40px;
+  --h: 44px;
   padding: 0 16px;
   font-size: 14px;
 }
@@ -761,7 +763,7 @@ button.demo-banner__tag::before,
 .demo-banner__switch a::before {
   content: '';
   position: absolute;
-  inset: -8px -4px;
+  inset: -11px -4px;
 }
 .demo-banner__switch a {
   position: relative;
@@ -773,6 +775,7 @@ button.demo-banner__tag::before,
 .demo-sheet__title {
   font-size: 30px;
   margin: 0;
+  color: var(--ink);
 }
 .demo-sheet__text {
   margin: 0;
@@ -918,4 +921,31 @@ button.demo-banner__tag::before,
 }
 .pres__nav:disabled {
   opacity: 0.3;
+}
+
+/* ---------------- Lot 7 : cibles tactiles ≥ 44 px ---------------- */
+.brand,
+.c-nav a:not(.btn) {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.seg button,
+.ops-tag,
+.chip,
+.hero2__more {
+  position: relative;
+}
+.seg button::before,
+.ops-tag::before,
+.chip::before,
+.hero2__more::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+@media (max-width: 389px) {
+  .demo-banner__more {
+    display: none;
+  }
 }

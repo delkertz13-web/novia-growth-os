@@ -872,3 +872,19 @@
 .ck-head__clock {
   color: var(--ochre);
 }
+
+/* petits écrans : l'état passe sous le nom, le nom de la cliente n'est jamais tronqué */
+@media (max-width: 419px) {
+  .ck-rail__row {
+    grid-template-columns: 48px 14px 1fr;
+    row-gap: 4px;
+  }
+  .ck-rail__time,
+  .ck-rail__dot {
+    grid-row: 1 / span 2;
+  }
+  .ck-rail__row > .ck-state {
+    grid-column: 3;
+    justify-self: start;
+  }
+}

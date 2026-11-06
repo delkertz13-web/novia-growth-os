@@ -3,7 +3,7 @@
  * qu'avec les providers de démo). Bandeau « DÉMO », réinitialisation complète du
  * scénario et mode présentation.
  */
-import { useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { novia } from '../domain'
 import { Icon } from './Icon'
@@ -44,6 +44,21 @@ export function DemoBanner() {
   const [confirming, setConfirming] = useState(false)
   const [done, setDone] = useState(false)
   const pres = usePresentation()
+  // les en-têtes collants se placent sous le bandeau complet (ligne DÉMO + barre de présentation éventuelle)
+  const bannerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = bannerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const apply = () => {
+      const parts = el.querySelectorAll<HTMLElement>(':scope > .demo-banner__row, :scope > .pres')
+      const h = Array.from(parts).reduce((sum, c) => sum + c.offsetHeight, 0)
+      document.documentElement.style.setProperty('--banner-h', `${h}px`)
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    el.querySelectorAll(':scope > .demo-banner__row, :scope > .pres').forEach((c) => ro.observe(c))
+    return () => ro.disconnect()
+  }, [pres.on])
   const close = () => {
     setOpen(false)
     setConfirming(false)
@@ -58,12 +73,14 @@ export function DemoBanner() {
   }
 
   return (
-    <div className="demo-banner" role="note" aria-label="Démonstration NOVIA, données fictives">
+    <div className="demo-banner" ref={bannerRef} role="note" aria-label="Démonstration NOVIA, données fictives">
       <div className="wrap demo-banner__row">
         <button type="button" className="demo-banner__tag" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label="Commandes de la démonstration">
           DÉMO <Icon name="settings" size={12} />
         </button>
-        <span className="demo-banner__text">Données fictives · rien n’est envoyé</span>
+        <span className="demo-banner__text">
+          Fictif<span className="demo-banner__more"> · aucun envoi réel</span>
+        </span>
         <nav className="demo-banner__switch" aria-label="Changer d’espace">
           <Link to="/" viewTransition className={!isPro ? 'is-active' : ''}>
             Cliente
@@ -124,6 +141,14 @@ export function DemoBanner() {
 
 function PresentationBar({ step }: { step: number }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  // navigation libre : si la présentatrice change de page elle-même, la barre suit (étape suivante la plus proche sur cette page)
+  useEffect(() => {
+    if (presentationSteps[step].path === pathname) return
+    const ahead = presentationSteps.findIndex((x, i) => i > step && x.path === pathname)
+    const any = ahead >= 0 ? ahead : presentationSteps.findIndex((x) => x.path === pathname)
+    if (any >= 0) presentation.set({ step: any })
+  }, [pathname]) // eslint-disable-line react-hooks/exhaustive-deps
   const s = presentationSteps[step]
   const go = (i: number) => {
     presentation.set({ step: i })

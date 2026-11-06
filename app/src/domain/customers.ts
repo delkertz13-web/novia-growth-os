@@ -16,7 +16,7 @@ export const segmentLabels: Record<Segment, string> = {
   to_follow_up: 'À relancer',
   refill: 'Remplissage à prévoir',
   new_lead: 'Nouveaux leads',
-  recent_no_show: 'No-show récent',
+  recent_no_show: 'Absence récente',
   human: 'Reprise humaine',
 }
 

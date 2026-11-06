@@ -61,14 +61,14 @@ export function reactionFor(
   switch (outcome) {
     case 'present':
       steps.push(
-        { key: 'status', tone: 'status', label: 'Présence enregistrée', detail: `Statut appliqué au rendez-vous ${before.ref}.` },
+        { key: 'status', tone: 'status', label: 'Présence enregistrée', detail: 'Le rendez-vous est marqué « présente » dans l’agenda.' },
         { key: 'novia', tone: 'calm', label: 'NOVIA clôt le suivi', detail: 'Plus de rappel pour ce rendez-vous.' },
         { key: 'money', tone: 'money', label: 'Revenu', amount: before.price, amountLabel: 'en CA réservé', detail: 'Il passera en CA confirmé avec une preuve de paiement.' },
       )
       break
 
     case 'absent':
-      steps.push({ key: 'status', tone: 'status', label: 'Absence enregistrée', detail: `Statut appliqué au rendez-vous ${before.ref}. Aucune sanction automatique.` })
+      steps.push({ key: 'status', tone: 'status', label: 'Absence enregistrée', detail: 'Marquée absente dans l’agenda. Aucune pénalité automatique.' })
       if (run?.state === 'active')
         steps.push({
           key: 'novia',
@@ -102,7 +102,7 @@ export function reactionFor(
 
     case 'rescheduled':
       steps.push(
-        { key: 'status', tone: 'status', label: 'Rendez-vous reporté', detail: `${dayTime(after.start)} · réf. ${after.ref}.` },
+        { key: 'status', tone: 'status', label: 'Rendez-vous reporté', detail: `Nouveau créneau : ${dayTime(after.start)}.` },
         {
           key: 'novia',
           tone: 'novia',

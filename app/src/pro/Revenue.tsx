@@ -7,7 +7,7 @@ import { novia } from '../domain'
 import { Notice, useDemoState, useNow } from '../ui/common'
 
 const defs: Record<RevenueLevel, string> = {
-  potential: 'Opportunités ouvertes : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
+  potential: 'Ce que NOVIA peut encore regagner : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
   booked: 'Rendez-vous réservés, ou prestations attestées sans preuve de paiement. Pas encore encaissé.',
   confirmed: 'Prestation attestée ET preuve de paiement (fictive dans la démo).',
 }
@@ -31,7 +31,7 @@ export function Revenue() {
           <Icon name="arrowLeft" size={18} />
         </Link>
         <div>
-          <div className="p-head__date">Revenue Attribution</div>
+          <div className="p-head__date">Ce que NOVIA rapporte</div>
           <h1 className="display">D’où vient le revenu</h1>
         </div>
       </header>
