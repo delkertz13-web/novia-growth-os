@@ -1,53 +1,24 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { serviceById } from "../config/services.demo";
-import {
-  appointmentEnd,
-  attendanceState,
-  outcomeLabels,
-} from "../core/appointmentStatus";
-import type {
-  Appointment,
-  Customer,
-  ValidationOutcome,
-  WorkflowRun,
-} from "../core/types";
-import { novia } from "../domain";
-import { Icon } from "../ui/Icon";
-import { capitalize, fmt, Sheet, StatusPill } from "../ui/common";
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { serviceById } from '../config/services.demo'
+import { appointmentEnd, attendanceState, outcomeLabels } from '../core/appointmentStatus'
+import type { Appointment, Customer, ValidationOutcome, WorkflowRun } from '../core/types'
+import { novia } from '../domain'
+import { Icon } from '../ui/Icon'
+import { capitalize, fmt, Sheet, StatusPill } from '../ui/common'
 
-export const customerName = (c?: Customer) =>
-  c ? `${c.firstName} ${c.lastName}` : "—";
+export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : '—')
 
 /* ---------------- Ligne de rendez-vous ---------------- */
 
 /** origine visible dans l'agenda quand NOVIA a obtenu le rendez-vous */
-const originTag: Partial<Record<Appointment["bookingOrigin"], string>> = {
-  voice: "Voice",
-  smartfill: "Créneau rempli",
-  recovery: "Récupérée",
-};
+const originTag: Partial<Record<Appointment['bookingOrigin'], string>> = { voice: 'Voice', smartfill: 'Créneau rempli', recovery: 'Récupérée' }
 
-export function AppointmentRow({
-  a,
-  customer,
-  now,
-  highlight,
-}: {
-  a: Appointment;
-  customer?: Customer;
-  now: Date;
-  highlight?: boolean;
-}) {
-  const s = serviceById(a.serviceId);
-  const past =
-    appointmentEnd(a).getTime() < now.getTime() &&
-    attendanceState(a, now) !== "unknown";
+export function AppointmentRow({ a, customer, now, highlight }: { a: Appointment; customer?: Customer; now: Date; highlight?: boolean }) {
+  const s = serviceById(a.serviceId)
+  const past = appointmentEnd(a).getTime() < now.getTime() && attendanceState(a, now) !== 'unknown'
   return (
-    <Link
-      to={`/pro/rdv/${a.id}`}
-      className={`appt ${past ? "is-past" : ""} ${highlight ? "is-highlight" : ""}`}
-    >
+    <Link to={`/pro/rdv/${a.id}`} className={`appt ${past ? 'is-past' : ''} ${highlight ? 'is-highlight' : ''}`}>
       <div className="appt__time">
         {fmt.time(a.start)}
         <small>{fmt.duration(a.durationMin)}</small>
@@ -56,11 +27,7 @@ export function AppointmentRow({
         <div className="appt__who">{customerName(customer)}</div>
         <div className="appt__what">
           {s?.name}
-          {originTag[a.bookingOrigin] && (
-            <span className={`origin-tag origin-tag--${a.bookingOrigin}`}>
-              {originTag[a.bookingOrigin]}
-            </span>
-          )}
+          {originTag[a.bookingOrigin] && <span className={`origin-tag origin-tag--${a.bookingOrigin}`}>{originTag[a.bookingOrigin]}</span>}
         </div>
       </div>
       <div className="appt__right">
@@ -68,61 +35,44 @@ export function AppointmentRow({
         <StatusPill appointment={a} now={now} compact />
       </div>
     </Link>
-  );
+  )
 }
 
 /* ---------------- Boutons Présente / Absente / Annulée / Reportée ---------------- */
 
-const order: ValidationOutcome[] = [
-  "present",
-  "absent",
-  "cancelled",
-  "rescheduled",
-];
-const statusOf: Record<ValidationOutcome, Appointment["status"]> = {
-  present: "showed",
-  absent: "no_show",
-  cancelled: "cancelled",
-  rescheduled: "rescheduled",
-};
+const order: ValidationOutcome[] = ['present', 'absent', 'cancelled', 'rescheduled']
+const statusOf: Record<ValidationOutcome, Appointment['status']> = {
+  present: 'showed',
+  absent: 'no_show',
+  cancelled: 'cancelled',
+  rescheduled: 'rescheduled',
+}
 
 export function OutcomeButtons({
   a,
   now,
   onPick,
 }: {
-  a: Appointment;
-  now: Date;
-  onPick: (o: ValidationOutcome) => void;
+  a: Appointment
+  now: Date
+  onPick: (o: ValidationOutcome) => void
 }) {
-  const started = new Date(a.start).getTime() <= now.getTime();
-  const closed = a.status === "rescheduled";
+  const started = new Date(a.start).getTime() <= now.getTime()
+  const closed = a.status === 'rescheduled'
   return (
-    <div
-      className="outcomes"
-      role="group"
-      aria-label="Statut réel du rendez-vous"
-    >
+    <div className="outcomes" role="group" aria-label="Statut réel du rendez-vous">
       {order.map((o) => {
-        const current = a.status === statusOf[o];
-        const disabled =
-          closed ||
-          current ||
-          ((o === "present" || o === "absent") && !started);
+        const current = a.status === statusOf[o]
+        const disabled = closed || current || ((o === 'present' || o === 'absent') && !started)
         return (
-          <button
-            key={o}
-            className={`outcome outcome--${o} ${current ? "is-current" : ""}`}
-            disabled={disabled}
-            onClick={() => onPick(o)}
-          >
+          <button key={o} className={`outcome outcome--${o} ${current ? 'is-current' : ''}`} disabled={disabled} onClick={() => onPick(o)}>
             <i />
             {outcomeLabels[o]}
           </button>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
 /* ---------------- Choix d'un nouveau créneau (report) ---------------- */
@@ -133,34 +83,30 @@ export function ReschedulePicker({
   onClose,
   onPick,
 }: {
-  a: Appointment;
-  open: boolean;
-  onClose: () => void;
-  onPick: (d: Date) => void;
+  a: Appointment
+  open: boolean
+  onClose: () => void
+  onPick: (d: Date) => void
 }) {
-  const [dayIdx, setDayIdx] = useState(0);
+  const [dayIdx, setDayIdx] = useState(0)
   const days = Array.from({ length: 14 }, (_, i) => {
-    const d = novia.now();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + i + 1);
-    return { d, slots: novia.pro.availableSlots(d, a.serviceId) };
-  }).filter((x) => x.slots.length);
-  const current = days[Math.min(dayIdx, days.length - 1)];
+    const d = novia.now()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + i + 1)
+    return { d, slots: novia.pro.availableSlots(d, a.serviceId) }
+  }).filter((x) => x.slots.length)
+  const current = days[Math.min(dayIdx, days.length - 1)]
   return (
     <Sheet open={open} onClose={onClose} label="Choisir un nouveau créneau">
-      <h2 className="display" style={{ fontSize: 30, margin: "0 0 4px" }}>
+      <h2 className="display" style={{ fontSize: 30, margin: '0 0 4px' }}>
         Reporter
       </h2>
-      <p className="muted" style={{ margin: "0 0 16px" }}>
+      <p className="muted" style={{ margin: '0 0 16px' }}>
         {serviceById(a.serviceId)?.name} · {fmt.duration(a.durationMin)}
       </p>
       <div className="chips" style={{ marginBottom: 16 }}>
         {days.map((x, i) => (
-          <button
-            key={x.d.toISOString()}
-            className={`chip chip--sm ${i === dayIdx ? "is-active" : ""}`}
-            onClick={() => setDayIdx(i)}
-          >
+          <button key={x.d.toISOString()} className={`chip chip--sm ${i === dayIdx ? 'is-active' : ''}`} onClick={() => setDayIdx(i)}>
             {capitalize(fmt.dayShort(x.d))}
           </button>
         ))}
@@ -168,63 +114,43 @@ export function ReschedulePicker({
       {current && (
         <div className="slots">
           {current.slots.map((s) => (
-            <button
-              key={s.toISOString()}
-              className="slot"
-              onClick={() => onPick(s)}
-            >
+            <button key={s.toISOString()} className="slot" onClick={() => onPick(s)}>
               {fmt.time(s)}
             </button>
           ))}
         </div>
       )}
     </Sheet>
-  );
+  )
 }
 
 /* ---------------- Séquence W03 / W04 ---------------- */
 
 const wfTitles: Record<string, string> = {
-  W03: "NOVIA récupère une annulation",
-  W04: "NOVIA récupère une absence",
-};
+  W03: 'NOVIA récupère une annulation',
+  W04: 'NOVIA récupère une absence',
+}
 
 const outcomeText: Record<string, string> = {
-  recovered: "Récupérée : elle a repris rendez-vous.",
-  no_response: "Pas de réponse : NOVIA s’est arrêtée.",
-  declined: "Elle ne souhaite pas reprendre rendez-vous : NOVIA s’est arrêtée.",
-  obsolete: "Statut corrigé : plus rien à récupérer.",
-  stopped: "NOVIA s’est arrêtée après vérification.",
-};
+  recovered: 'Récupérée : elle a repris rendez-vous.',
+  no_response: 'Pas de réponse : NOVIA s’est arrêtée.',
+  declined: 'Elle ne souhaite pas reprendre rendez-vous : NOVIA s’est arrêtée.',
+  obsolete: 'Statut corrigé : plus rien à récupérer.',
+  stopped: 'NOVIA s’est arrêtée après vérification.',
+}
 
-export function RunCard({
-  run,
-  customer,
-  compact = false,
-}: {
-  run: WorkflowRun;
-  customer?: Customer;
-  compact?: boolean;
-}) {
-  const [toast, setToast] = useState("");
-  const actions = compact ? run.actions.slice(-3) : run.actions;
+export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; customer?: Customer; compact?: boolean }) {
+  const [toast, setToast] = useState('')
+  const actions = compact ? run.actions.slice(-3) : run.actions
   const flash = (t: string) => {
-    setToast(t);
-    setTimeout(() => setToast(""), 2400);
-  };
+    setToast(t)
+    setTimeout(() => setToast(''), 2400)
+  }
   return (
     <article className="card run">
       <div className="run__head">
         <div>
-          <div className={`run__wf run__wf--${run.state}`}>
-            {run.state === "active"
-              ? "En cours"
-              : run.state === "paused"
-                ? "En pause"
-                : run.outcome === "recovered"
-                  ? "Réussie"
-                  : "Terminée"}
-          </div>
+          <div className={`run__wf run__wf--${run.state}`}>{run.state === 'active' ? 'En cours' : run.state === 'paused' ? 'En pause' : run.outcome === 'recovered' ? 'Réussie' : 'Terminée'}</div>
           <div className="run__title">
             {wfTitles[run.workflow] ?? run.workflow} · {customerName(customer)}
           </div>
@@ -232,10 +158,7 @@ export function RunCard({
       </div>
       <ol className="steps">
         {actions.map((x, i) => (
-          <li
-            key={i + x.at}
-            className={i === actions.length - 1 ? "is-new" : ""}
-          >
+          <li key={i + x.at} className={i === actions.length - 1 ? 'is-new' : ''}>
             <span className={`steps__dot steps__dot--${x.kind}`} />
             {x.label}
             <span className="steps__time">
@@ -244,75 +167,53 @@ export function RunCard({
           </li>
         ))}
       </ol>
-      {run.state === "active" ? (
+      {run.state === 'active' ? (
         <>
           {novia.demo && (
-            <div
-              className="run__actions"
-              role="group"
-              aria-label="Simuler la suite (démo)"
-            >
+            <div className="run__actions" role="group" aria-label="Simuler la suite (démo)">
               <span className="run__sim">Simuler</span>
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => novia.demo?.advanceRecovery(run.id)}
-              >
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.advanceRecovery(run.id)}>
                 <Icon name="play" size={14} /> Le temps passe
               </button>
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => {
-                  const a = novia.demo?.clientRebooks(run.id);
-                  if (a)
-                    flash(
-                      `${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`,
-                    );
+                  const a = novia.demo?.clientRebooks(run.id)
+                  if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
                 }}
               >
                 Elle réserve
               </button>
-              <button
-                className="btn btn--ghost btn--sm"
-                onClick={() => novia.demo?.clientDeclines(run.id)}
-              >
+              <button className="btn btn--ghost btn--sm" onClick={() => novia.demo?.clientDeclines(run.id)}>
                 Elle refuse
               </button>
             </div>
           )}
           {customer && (
-            <button
-              className="btn btn--ghost btn--sm run__takeover"
-              onClick={() => novia.pro.takeOverConversation(customer.id)}
-            >
+            <button className="btn btn--ghost btn--sm run__takeover" onClick={() => novia.pro.takeOverConversation(customer.id)}>
               <Icon name="message" size={14} /> Reprendre la conversation
             </button>
           )}
         </>
-      ) : run.state === "paused" ? (
+      ) : run.state === 'paused' ? (
         <div className="run__paused">
           <span>
-            <Icon name="pause" size={14} /> En pause : vous avez repris la
-            conversation. Aucun message n’est envoyé.
+            <Icon name="pause" size={14} /> En pause : vous avez repris la conversation. Aucun message n’est envoyé.
           </span>
           {customer && (
-            <button
-              className="btn btn--primary btn--sm"
-              onClick={() => novia.pro.letNoviaHandle(customer.id)}
-            >
+            <button className="btn btn--primary btn--sm" onClick={() => novia.pro.letNoviaHandle(customer.id)}>
               <Icon name="sparkle" size={14} /> Rendre à NOVIA
             </button>
           )}
         </div>
       ) : (
-        <div
-          className={`run__result ${run.outcome === "recovered" ? "" : "run__result--neutral"}`}
-        >
-          {outcomeText[run.outcome ?? "stopped"]}
+        <div className={`run__result ${run.outcome === 'recovered' ? '' : 'run__result--neutral'}`}>
+          {outcomeText[run.outcome ?? 'stopped']}
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
     </article>
-  );
+  )
 }
 
 export function StatTile({
@@ -322,11 +223,11 @@ export function StatTile({
   variant,
   to,
 }: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  variant?: "dark" | "alert";
-  to?: string;
+  label: string
+  value: string | number
+  hint?: string
+  variant?: 'dark' | 'alert'
+  to?: string
 }) {
   const body = (
     <>
@@ -334,13 +235,13 @@ export function StatTile({
       <span className="stat__value">{value}</span>
       {hint && <span className="stat__hint">{hint}</span>}
     </>
-  );
-  const cls = `stat ${variant ? `stat--${variant}` : ""}`;
+  )
+  const cls = `stat ${variant ? `stat--${variant}` : ''}`
   return to ? (
     <Link to={to} className={cls}>
       {body}
     </Link>
   ) : (
     <div className={cls}>{body}</div>
-  );
+  )
 }
