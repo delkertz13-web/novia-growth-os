@@ -1,5 +1,6 @@
 import type { WorkflowRules } from '../config/schema'
 import { isActiveBooking } from './appointmentStatus'
+import { optOutReason } from './optout'
 import type { Appointment, Customer, WorkflowAction, WorkflowId, WorkflowRun } from './types'
 
 /* ------------------------------------------------------------------ */
@@ -95,7 +96,7 @@ export function evaluateGuards(ctx: GuardContext): GuardDecision {
     return { kind: 'stop', reason: 'Elle est déjà cliente.' }
   }
 
-  if (customer.optOut) return { kind: 'stop', reason: 'Opposition enregistrée : la cliente a répondu STOP.' }
+  if (customer.optOut) return { kind: 'stop', reason: optOutReason }
   if (!customer.consent.transactional) return { kind: 'stop', reason: 'Pas de consentement pour lui écrire.' }
   if (customer.humanTakeover) return { kind: 'stop', reason: 'Vous avez repris la conversation.' }
 
@@ -150,6 +151,8 @@ export function startRecovery(
   source: Appointment,
   rules: WorkflowRules,
   now: Date,
+  /** si la cliente a répondu STOP, la récupération sortante ne démarre pas */
+  customer?: Pick<Customer, 'optOut'>,
 ): WorkflowRun {
   if (workflow === 'W04' && source.status !== 'no_show') {
     throw new Error('W04 ne démarre que sur une absence confirmée.')
@@ -158,7 +161,7 @@ export function startRecovery(
     throw new Error('W03 ne démarre que sur une annulation confirmée.')
   }
   const wait = workflow === 'W03' ? rules.w03.waitBeforeRecoveryHours : rules.w04.waitBeforeRecoveryHours
-  return {
+  const run: WorkflowRun = {
     id: runId(workflow, source),
     workflow,
     customerId: source.customerId,
@@ -172,6 +175,8 @@ export function startRecovery(
       act(now, 'info', `NOVIA attend ${wait} h avant d’écrire.`),
     ],
   }
+  if (!customer?.optOut) return run
+  return { ...run, state: 'stopped', step: 'done', endedAt: now.toISOString(), outcome: 'stopped', actions: [run.actions[0], act(now, 'stop', optOutReason)] }
 }
 
 const stopRun = (run: WorkflowRun, now: Date, reason: string, outcome: string): WorkflowRun => ({

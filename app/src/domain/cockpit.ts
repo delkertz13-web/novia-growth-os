@@ -11,6 +11,7 @@ import { refillsDue } from '../core/smartfill'
 import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowAction, WorkflowId, WorkflowRun } from '../core/types'
 import type { NoviaSnapshot } from '../providers/types'
 import { buildInbox, type InboxItem } from './conversations'
+import { mayInitiateOutbound } from '../core/optout'
 import { buildCustomerRows, type Segment } from './customers'
 
 export const sameDay = (a: Date, b: Date) =>
@@ -217,7 +218,7 @@ export function buildCustomerFile(snap: NoviaSnapshot, customerId: string, now: 
     runs: snap.runs.filter((r) => r.customerId === customerId).sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     noShows: noShowCounts(snap.appointments, customerId, now),
     lifetimeValue: appointments.filter((a) => a.status === 'showed').reduce((s, a) => s + a.price, 0),
-    contactable: !customer.optOut && customer.consent.marketing && !customer.humanTakeover,
+    contactable: mayInitiateOutbound(customer),
     refill: refill ? { daysSince: refill.daysSince, recommended: refill.recommended } : undefined,
     amounts: {
       booked: appointments.filter((a) => appointmentLevel(a) === 'booked').reduce((s, a) => s + a.price, 0),

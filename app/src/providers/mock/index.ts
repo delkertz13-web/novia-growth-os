@@ -261,11 +261,11 @@ export const MockBookingProvider: BookingProvider = {
     const auto = automations()
     if (outcome === 'absent') {
       // le montant reste « à récupérer » ; la séquence ne démarre que si la récupération est activée
-      if (auto.noShowRecovery) newRun = startRecovery('W04', res.updated, liveRules(), t)
+      if (auto.noShowRecovery) newRun = startRecovery('W04', res.updated, liveRules(), t, customer)
       newOpps.push({ id: nextId('o'), kind: 'noshow_recovery', amount: a.price, status: 'open', createdAt: t.toISOString(), sourceAppointmentId: a.id })
     }
     if (outcome === 'cancelled') {
-      newRun = auto.cancellationRecovery ? startRecovery('W03', res.updated, liveRules(), t) : undefined
+      newRun = auto.cancellationRecovery ? startRecovery('W03', res.updated, liveRules(), t, customer) : undefined
       // W03 : vérification immédiate (nouveau RDV, opposition, reprise humaine…)
       const g = evaluateGuards({
         customer,
