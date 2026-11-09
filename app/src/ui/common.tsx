@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { attendanceState, statusLabels } from '../core/appointmentStatus'
+import * as time from '../core/time'
 import type { Appointment } from '../core/types'
 import { novia } from '../domain'
 import { Icon } from './Icon'
@@ -26,24 +27,37 @@ export function useNow(intervalMs = 30_000) {
 
 /* ---------------- Formats ---------------- */
 
+/** Toutes les dates s'affichent et se comparent dans le fuseau du SALON, jamais celui de l'appareil. */
+const tz = novia.timeZone
+
 export const fmt = {
-  time: (d: Date | string) =>
-    new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'),
-  dayLong: (d: Date | string) =>
-    new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }),
-  dayShort: (d: Date | string) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }),
+  time: (d: Date | string) => time.formatIn(d, tz, { hour: '2-digit', minute: '2-digit' }).replace(':', 'h'),
+  dayLong: (d: Date | string) => time.formatIn(d, tz, { weekday: 'long', day: 'numeric', month: 'long' }),
+  dayShort: (d: Date | string) => time.formatIn(d, tz, { weekday: 'short', day: 'numeric', month: 'short' }),
+  /** formatage libre, toujours dans le fuseau du salon */
+  date: (d: Date | string, options: Intl.DateTimeFormatOptions) => time.formatIn(d, tz, options),
   duration: (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60}` : ''}` : `${min} min`),
   eur: (n: number) => `${n.toLocaleString('fr-FR')} €`,
 }
 
-export const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+/** Calendrier du salon pour l'interface (jour, heure murale, jours suivants). */
+export const salon = {
+  sameDay: (a: Date, b: Date) => time.sameDay(a, b, tz),
+  startOfDay: (d: Date) => time.startOfDay(d, tz),
+  addDays: (d: Date, n: number) => time.addDays(d, n, tz),
+  wall: (d: Date) => time.wall(d, tz),
+  dayKey: (d: Date) => time.dayKey(d, tz),
+  daysBetween: (a: Date, b: Date) => time.daysBetween(a, b, tz),
+  monthOf: (d: Date) => time.monthOf(d, tz),
+  parseDayKey: (key: string) => time.parseWall(key, tz),
+}
+
+export const sameDay = salon.sameDay
 
 export const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /* ---------------- Bandeau démo : voir ./demo.tsx ---------------- */
 
-export { DemoBanner } from './demo'
 
 /* ---------------- Badges ---------------- */
 

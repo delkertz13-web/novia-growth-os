@@ -5,7 +5,8 @@
  * réservation, workflows, indicateurs) vit à cette date et à cette heure de référence.
  * La démonstration est donc identique le matin, le soir ou un autre jour.
  *
- * Heure locale du navigateur (sans fuseau) : l'agenda affiche 15h10 partout.
+ * Heure MURALE du salon, lue dans son fuseau (BusinessProfile, Europe/Paris en démo) :
+ * l'agenda affiche 15h10 quel que soit le fuseau de l'appareil qui présente la démo.
  * Choisir un jour ouvert, l'après-midi : scenario.test.ts vérifie que la référence
  * produit toutes les situations attendues (RDV à confirmer, créneau SmartFill, etc.).
  */

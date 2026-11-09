@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gallery } from '../config/content.demo'
+import { gallery } from '../demo/config/content'
 import { defaultWidth, hasFictionalMedia, heroSlots, mediaUrl, objectPosition, resolveMedia, srcSet } from './media'
 import type { MediaAsset, MediaManifest } from './types'
 

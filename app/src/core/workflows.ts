@@ -1,6 +1,7 @@
 import type { WorkflowRules } from '../config/schema'
 import { isActiveBooking } from './appointmentStatus'
 import { optOutReason } from './optout'
+import { addDays, atTime, minutesOfDay } from './time'
 import type { Appointment, Customer, WorkflowAction, WorkflowId, WorkflowRun } from './types'
 
 /* ------------------------------------------------------------------ */
@@ -12,20 +13,17 @@ const toMinutes = (hhmm: string) => {
   return h * 60 + m
 }
 
-export function isWithinSendWindow(at: Date, window: WorkflowRules['sendWindow']): boolean {
-  const m = at.getHours() * 60 + at.getMinutes()
+/** La plage d'envoi s'entend en heure du SALON (`timeZone`), jamais de l'appareil. */
+export function isWithinSendWindow(at: Date, window: WorkflowRules['sendWindow'], timeZone: string): boolean {
+  const m = minutesOfDay(at, timeZone)
   return m >= toMinutes(window.start) && m < toMinutes(window.end)
 }
 
-/** Prochaine ouverture de la plage d'envoi (ou `at` si déjà dans la plage). */
-export function nextSendWindowStart(at: Date, window: WorkflowRules['sendWindow']): Date {
-  if (isWithinSendWindow(at, window)) return at
-  const start = toMinutes(window.start)
-  const d = new Date(at)
-  const m = at.getHours() * 60 + at.getMinutes()
-  if (m >= toMinutes(window.end)) d.setDate(d.getDate() + 1)
-  d.setHours(Math.floor(start / 60), start % 60, 0, 0)
-  return d
+/** Prochaine ouverture de la plage d'envoi (ou `at` si déjà dans la plage), heure du salon. */
+export function nextSendWindowStart(at: Date, window: WorkflowRules['sendWindow'], timeZone: string): Date {
+  if (isWithinSendWindow(at, window, timeZone)) return at
+  const day = minutesOfDay(at, timeZone) >= toMinutes(window.end) ? addDays(at, 1, timeZone) : at
+  return atTime(day, window.start, timeZone)
 }
 
 /* ------------------------------------------------------------------ */
@@ -38,6 +36,8 @@ export interface GuardContext {
   runs: WorkflowRun[]
   now: Date
   rules: WorkflowRules
+  /** fuseau du salon : la plage d'envoi s'y lit */
+  timeZone: string
   /** workflow qui demande l'envoi */
   workflow: WorkflowId
   /** run concerné (exclu du contrôle d'incompatibilité) */
@@ -111,8 +111,8 @@ export function evaluateGuards(ctx: GuardContext): GuardDecision {
     return { kind: 'wait', reason: 'Un autre suivi NOVIA est déjà en cours pour elle.', until: now }
   }
 
-  if (!isWithinSendWindow(now, rules.sendWindow)) {
-    return { kind: 'wait', reason: 'En dehors de vos horaires d’envoi : NOVIA attend.', until: nextSendWindowStart(now, rules.sendWindow) }
+  if (!isWithinSendWindow(now, rules.sendWindow, ctx.timeZone)) {
+    return { kind: 'wait', reason: 'En dehors de vos horaires d’envoi : NOVIA attend.', until: nextSendWindowStart(now, rules.sendWindow, ctx.timeZone) }
   }
   return { kind: 'send' }
 }
@@ -163,6 +163,7 @@ export function startRecovery(
   const wait = workflow === 'W03' ? rules.w03.waitBeforeRecoveryHours : rules.w04.waitBeforeRecoveryHours
   const run: WorkflowRun = {
     id: runId(workflow, source),
+    businessId: source.businessId,
     workflow,
     customerId: source.customerId,
     appointmentId: source.id,

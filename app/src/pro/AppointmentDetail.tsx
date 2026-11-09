@@ -1,9 +1,8 @@
 import { Link, useParams } from 'react-router-dom'
-import { serviceById } from '../config/services.demo'
+import { novia, originLabels, serviceById } from '../domain'
 import { attendanceState, isAwaitingValidation, noShowCounts, statusLabels } from '../core/appointmentStatus'
 import { appointmentLevel, formatEUR, levelLabels, sourceLabels } from '../core/revenue'
 import { buildValidationSms } from '../core/smsValidation'
-import { novia, originLabels } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, SimBadge, StatusPill, useDemoState, useNow } from '../ui/common'
 import { customerName, OutcomeButtons, RunCard } from './parts'
@@ -141,7 +140,7 @@ export function AppointmentDetail() {
             <span style={{ fontWeight: 600 }}>Validation par SMS</span>
             <SimBadge label="Aperçu · non envoyé" />
           </div>
-          <pre className="sms">{buildValidationSms(smsList)}</pre>
+          <pre className="sms">{buildValidationSms(smsList, novia.timeZone)}</pre>
           <div className="muted" style={{ fontSize: 12.5 }}>
             Avec plusieurs rendez-vous en attente, chaque ligne porte un identifiant : une réponse ambiguë n’est jamais appliquée.
           </div>

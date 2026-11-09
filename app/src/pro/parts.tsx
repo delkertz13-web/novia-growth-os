@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { serviceById } from '../config/services.demo'
+import { novia, serviceById } from '../domain'
 import { appointmentEnd, attendanceState, outcomeLabels } from '../core/appointmentStatus'
 import type { Appointment, Customer, ValidationOutcome, WorkflowRun } from '../core/types'
-import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Sheet, StatusPill } from '../ui/common'
+import { capitalize, fmt, salon, Sheet, StatusPill } from '../ui/common'
 
 export const customerName = (c?: Customer) => (c ? `${c.firstName} ${c.lastName}` : '—')
 
@@ -90,9 +89,7 @@ export function ReschedulePicker({
 }) {
   const [dayIdx, setDayIdx] = useState(0)
   const days = Array.from({ length: 14 }, (_, i) => {
-    const d = novia.now()
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + i + 1)
+    const d = salon.startOfDay(salon.addDays(novia.now(), i + 1))
     return { d, slots: novia.pro.availableSlots(d, a.serviceId) }
   }).filter((x) => x.slots.length)
   const current = days[Math.min(dayIdx, days.length - 1)]
@@ -177,8 +174,8 @@ export function RunCard({ run, customer, compact = false }: { run: WorkflowRun; 
               </button>
               <button
                 className="btn btn--ghost btn--sm"
-                onClick={() => {
-                  const a = novia.demo?.clientRebooks(run.id)
+                onClick={async () => {
+                  const a = await novia.demo?.clientRebooks(run.id)
                   if (a) flash(`${customer?.firstName} a réservé ${fmt.dayShort(a.start)} à ${fmt.time(a.start)} (simulé)`)
                 }}
               >

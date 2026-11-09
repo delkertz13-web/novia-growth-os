@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { capitalize, fmt, sameDay, useDemoState, useNow } from '../ui/common'
+import { capitalize, fmt, salon, sameDay, useDemoState, useNow } from '../ui/common'
 import { AppointmentRow } from './parts'
 
 export function Agenda() {
@@ -11,18 +11,13 @@ export function Agenda() {
   const [offset, setOffset] = useState(() => {
     const j = params.get('jour')
     if (!j) return 0
-    const [y, m, d] = j.split('-').map(Number)
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const diff = Math.round((new Date(y, m - 1, d).getTime() - today.getTime()) / 86_400_000)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(j)) return 0
+    const diff = salon.daysBetween(now, salon.parseDayKey(j))
     return Math.max(-2, Math.min(7, diff))
   })
   const highlight = params.get('rdv')
-  const days = Array.from({ length: 10 }, (_, i) => {
-    const d = new Date(now)
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + i - 2)
-    return d
-  })
+  // jours du SALON (fuseau de l'entreprise), à minuit
+  const days = Array.from({ length: 10 }, (_, i) => salon.startOfDay(salon.addDays(now, i - 2)))
   const day = days[offset + 2]
   const list = st.appointments
     .filter((a) => sameDay(new Date(a.start), day) && a.status !== 'rescheduled')
@@ -42,8 +37,8 @@ export function Agenda() {
           const n = st.appointments.filter((a) => sameDay(new Date(a.start), d) && a.status !== 'rescheduled' && a.status !== 'cancelled').length
           return (
             <button key={d.toISOString()} className={`day ${i === offset + 2 ? 'is-selected' : ''}`} onClick={() => setOffset(i - 2)} aria-selected={i === offset + 2}>
-              <small>{d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}</small>
-              <b>{d.getDate()}</b>
+              <small>{fmt.date(d, { weekday: 'short' }).replace('.', '')}</small>
+              <b>{salon.wall(d).day}</b>
               <i>{n ? `${n} RDV` : '—'}</i>
             </button>
           )

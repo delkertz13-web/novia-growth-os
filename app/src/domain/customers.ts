@@ -6,7 +6,7 @@ import type { ServiceConfig } from '../config/schema'
 import { isActiveBooking } from '../core/appointmentStatus'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, Customer } from '../core/types'
-import type { NoviaSnapshot } from '../providers/types'
+import type { NoviaSnapshot } from '../engine/model'
 import { normalize } from './conversations'
 
 export type Segment = 'active' | 'to_follow_up' | 'refill' | 'new_lead' | 'recent_no_show' | 'human'

@@ -4,7 +4,7 @@ import '@fontsource-variable/inter'
 import './styles/app.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, Navigate, Outlet, RouterProvider, useParams } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider, useParams } from 'react-router-dom'
 import { Booking } from './client/Booking'
 import { ClientLayout } from './client/ClientLayout'
 import { Gallery } from './client/Gallery'
@@ -21,21 +21,15 @@ import { Dashboard } from './pro/Dashboard'
 import { Novia } from './pro/Novia'
 import { ProLayout } from './pro/ProLayout'
 import { Revenue } from './pro/Revenue'
-import { DemoBanner, ScrollTop } from './ui/common'
-import { useResetEpoch } from './ui/demo'
-
-/** Après une réinitialisation de la démo, les écrans repartent de zéro (aucun état résiduel). */
-function Epoch() {
-  const epoch = useResetEpoch()
-  return <Outlet key={epoch} />
-}
+import { ScrollTop } from './ui/common'
+// démo : bandeau DÉMO + remise à zéro ; pilote : rien (aiguillé par NOVIA_MODE, vite.config.ts)
+import { Shell } from '@novia/shell'
 
 function Root() {
   return (
     <>
       <ScrollTop />
-      <DemoBanner />
-      <Epoch />
+      <Shell />
     </>
   )
 }

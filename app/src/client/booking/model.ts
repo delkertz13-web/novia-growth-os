@@ -2,6 +2,7 @@
  * Réservation — logique pure de présentation (aucun DOM, aucun provider), testée à part.
  */
 import type { OpeningHours, ServiceConfig, WorkflowRules } from '../../config/schema'
+import { sameDay as sameSalonDay, weekday } from '../../core/time'
 import { reminderTimes } from '../../core/workflows'
 import type { Appointment } from '../../core/types'
 
@@ -11,8 +12,9 @@ export const steps: Step[] = ['service', 'when', 'contact', 'recap']
 /** État d'un jour dans la bande de dates : fermé (horaires), complet, ou nombre de créneaux. */
 export type DayState = { kind: 'closed' } | { kind: 'full' } | { kind: 'open'; count: number }
 
-export function dayState(day: Date, hours: OpeningHours, slotCount: number): DayState {
-  if (!hours[day.getDay()]) return { kind: 'closed' }
+/** `day` est un jour du salon : ses horaires se lisent dans le fuseau de l'entreprise. */
+export function dayState(day: Date, hours: OpeningHours, slotCount: number, timeZone: string): DayState {
+  if (!hours[weekday(day, timeZone)]) return { kind: 'closed' }
   if (slotCount === 0) return { kind: 'full' }
   return { kind: 'open', count: slotCount }
 }
@@ -21,8 +23,7 @@ export const dayStateLabel = (s: DayState) => (s.kind === 'closed' ? 'Fermé' : 
 
 export const slotEnd = (start: Date, durationMin: number) => new Date(start.getTime() + durationMin * 60_000)
 
-export const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+export const sameDay = (a: Date, b: Date, timeZone: string) => sameSalonDay(a, b, timeZone)
 
 /**
  * Place de la pose choisie dans le parcours : grande au moment de choisir la date,

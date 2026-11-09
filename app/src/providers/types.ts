@@ -1,111 +1,121 @@
 /**
- * Interfaces des services NOVIA : la frontière entre le domaine NOVIA et les backends.
+ * Contrats V2 des providers : la frontière entre NOVIA et les fournisseurs TECHNIQUES.
  *
- *   UI (React)  →  domaine NOVIA (src/domain)  →  ces interfaces  →  implémentations
+ *   UI  →  NOVIA (application + moteur, src/domain + src/engine)  →  core (règles pures)
+ *                         │
+ *                         └→ ces contrats  →  Mock aujourd'hui · GHL / SMS direct / Voice / paiement demain
  *
- * Aujourd'hui seules les implémentations Mock existent (src/providers/mock).
- * Les implémentations GHL, Voice et Payment sont préparées dans src/providers/ghl et
- * src/providers/future : elles implémentent ces MÊMES interfaces mais ne sont PAS
- * connectées. Passer de l'une à l'autre se fait dans src/providers/index.ts, sans
- * toucher à l'interface utilisateur.
+ * Un provider ne DÉCIDE rien : il transporte (message, appel, miroir CRM, paiement) et
+ * rapporte des faits (livraison, appel terminé, paiement reçu) sous forme d'événements.
+ * Aucune règle NOVIA ne dépend d'un provider ; changer de messagerie (GHL ↔ SMS direct)
+ * ne touche ni au moteur ni au noyau.
+ *
+ * Règles communes :
+ * - tout est asynchrone (Promise) ;
+ * - aucune exception ne sort : le résultat est explicite (`ProviderResult`) ;
+ * - une erreur est typée et dit si elle est RETENTABLE ;
+ * - toute écriture porte une `idempotencyKey` : rejouée, elle ne produit qu'un effet ;
+ * - les objets créés chez le fournisseur sont référencés par `ExternalRef`.
  */
-import type { ServiceConfig } from '../config/schema'
-import type { RevenueReport } from '../core/revenue'
-import type {
-  Appointment,
-  BookingOrigin,
-  Conversation,
-  ConversationMessage,
-  NoviaSettings,
-  VoiceCall,
-  Opportunity,
-  WaitlistEntry,
-  WorkflowRun,
-  Customer,
-  LeadSource,
-  PaymentProof,
-  StatusSource,
-  ValidationOutcome,
-} from '../core/types'
+import type { Appointment, BusinessId, Customer, ExternalRef } from '../core/types'
+import type { VoiceSettings } from '../core/types'
 
-export interface BookingInput {
-  serviceId: string
-  start: Date
-  contact: { firstName: string; lastName: string; phone: string; email: string }
-  source: LeadSource
-  origin: BookingOrigin
+/* ------------------------------------------------------------------ */
+/* Résultats et erreurs                                                 */
+/* ------------------------------------------------------------------ */
+
+export type ProviderErrorCode =
+  | 'not_connected' // provider préparé mais non branché
+  | 'unavailable' // panne, délai dépassé (retentable)
+  | 'rate_limited' // trop de requêtes (retentable)
+  | 'invalid_request' // donnée refusée (numéro invalide…) : ne pas retenter
+  | 'rejected' // refus du fournisseur (opposition, compte suspendu) : ne pas retenter
+  | 'unexpected' // exception imprévue, capturée par NOVIA (retentable)
+
+export interface ProviderError {
+  provider: string
+  code: ProviderErrorCode
+  message: string
+  retryable: boolean
 }
 
-export interface BookingProvider {
-  listServices(): ServiceConfig[]
-  getSlots(day: Date, serviceId: string): Date[]
-  createBooking(input: BookingInput): Appointment
-  listAppointments(): Appointment[]
-  validate(appointmentId: string, outcome: ValidationOutcome, opts: { source: StatusSource; newStart?: Date }): Appointment
+export type ProviderResult<T> = { ok: true; value: T } | { ok: false; error: ProviderError }
+
+/** Toute écriture chez un fournisseur. */
+export interface WriteRequest {
+  businessId: BusinessId
+  /** même clé → même effet, une seule fois */
+  idempotencyKey: string
 }
 
-export interface CRMProvider {
-  listCustomers(): Customer[]
-  getCustomer(id: string): Customer | undefined
-  /** déduplication obligatoire (W01) */
-  upsertContact(contact: BookingInput['contact'], source: LeadSource): Customer
-  setHumanTakeover(customerId: string, value: boolean): void
-}
+/* ------------------------------------------------------------------ */
+/* Messagerie (SMS aujourd'hui ; GHL ou opérateur direct : décision ouverte) */
+/* ------------------------------------------------------------------ */
 
-export interface SimulatedMessage {
-  id: string
-  at: string
-  to: string
-  customerId?: string
-  appointmentId?: string
+export interface SendMessageRequest extends WriteRequest {
+  to: { customerId: string; phone: string; name: string }
   channel: 'sms'
-  purpose: string
   body: string
+  /** finalité : un fournisseur peut filtrer le marketing (heures, opposition) */
+  purpose: 'transactional' | 'marketing' | 'conversation'
+}
+
+export interface SendMessageResult {
+  externalRef: ExternalRef
+  /** simulated : démo, rien n'est parti */
+  status: 'accepted' | 'simulated'
 }
 
 export interface MessagingProvider {
-  /** Ne transmet RIEN : consigne le message qui aurait été envoyé. */
-  simulateSend(msg: Omit<SimulatedMessage, 'id' | 'at'>): SimulatedMessage
-  listSimulated(): SimulatedMessage[]
-  /** Conversations avec les clientes (SMS, Instagram, site). */
-  listConversations(): Conversation[]
-  /** Retrouve ou ouvre la conversation d'une cliente. */
-  openConversation(customerId: string, channel: Conversation['channel']): Conversation
-  /** Consigne un message (aucun envoi réel en démo). */
-  appendMessage(conversationId: string, msg: Omit<ConversationMessage, 'id' | 'at'>): ConversationMessage
-  updateConversation(conversationId: string, patch: Partial<Pick<Conversation, 'needsHuman' | 'needsHumanReason' | 'unread'>>): void
+  readonly name: string
+  send(req: SendMessageRequest): Promise<ProviderResult<SendMessageResult>>
 }
 
-export type VoiceMode = 'all' | 'missed' | 'after_hours'
-export interface VoiceSettings {
-  active: boolean
-  mode: VoiceMode
+/* ------------------------------------------------------------------ */
+/* Miroir CRM (optionnel : GHL peut en être un, il n'est jamais la base) */
+/* ------------------------------------------------------------------ */
+
+export interface CrmMirrorProvider {
+  readonly name: string
+  upsertContact(req: WriteRequest & { customer: Pick<Customer, 'id' | 'firstName' | 'lastName' | 'phone' | 'email'>; marketingConsent: boolean; source: string }): Promise<ProviderResult<{ externalRef: ExternalRef }>>
+  /** reflète STOP (ex. « ne pas déranger ») : l'opposition reste décidée par NOVIA */
+  setOptOut(req: WriteRequest & { customerId: string; externalRef?: ExternalRef; optOut: boolean }): Promise<ProviderResult<void>>
 }
+
+/* ------------------------------------------------------------------ */
+/* Voice                                                                */
+/* ------------------------------------------------------------------ */
 
 export interface VoiceProvider {
-  getSettings(): VoiceSettings
-  setSettings(s: Partial<VoiceSettings>): void
-  listCalls(): VoiceCall[]
-  /** Consigne un appel traité (en démo : appel simulé). */
-  logCall(call: Omit<VoiceCall, 'id'>): VoiceCall
+  readonly name: string
+  /** pousse les réglages décidés dans NOVIA vers la plateforme téléphonique */
+  configure(req: WriteRequest & { settings: VoiceSettings; greeting: string }): Promise<ProviderResult<void>>
 }
 
-/**
- * Réglages de NOVIA. Ils appartiennent au domaine NOVIA (stockés par NOVIA, pas par
- * un backend tiers) : un futur GHL les reçoit, il ne les définit pas.
- */
-export interface SettingsProvider {
-  get(): NoviaSettings
-  update(patch: Partial<NoviaSettings>): NoviaSettings
-}
+/* ------------------------------------------------------------------ */
+/* Paiement en ligne (phase P9 si besoin)                               */
+/* ------------------------------------------------------------------ */
 
 export interface PaymentProvider {
-  /** Preuve de paiement FICTIVE, utilisée pour illustrer le CA confirmé. */
-  recordDemoPayment(appointmentId: string): PaymentProof
+  readonly name: string
+  /** lien de paiement d'acompte ; le paiement reçu revient en événement PaymentRecorded */
+  createPaymentLink(req: WriteRequest & { appointment: Pick<Appointment, 'id' | 'deposit' | 'price'> }): Promise<ProviderResult<{ url: string; externalRef: ExternalRef }>>
 }
 
-export interface AnalyticsProvider {
-  getRevenue(period?: { from: Date; to: Date }): RevenueReport
+/* ------------------------------------------------------------------ */
+/* Agenda externe (scénario Planity A : Planity fait autorité sur l'agenda) */
+/* ------------------------------------------------------------------ */
+
+export interface BusyInterval {
+  start: string
+  end: string
+  externalRef?: ExternalRef
+}
+
+export interface ExternalCalendarProvider {
+  readonly name: string
+  /** créneaux occupés connus du fournisseur, pour ne jamais proposer un créneau déjà pris */
+  listBusy(req: { businessId: BusinessId; from: string; to: string }): Promise<ProviderResult<BusyInterval[]>>
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,85 +124,20 @@ export interface AnalyticsProvider {
 
 /**
  * « Maintenant » pour NOVIA. En démo : heure de référence contrôlée ; en production :
- * heure système du salon. Rien d'autre ne doit lire l'heure.
+ * heure système. L'heure n'est LUE que via ce provider ; elle n'est INTERPRÉTÉE (jour,
+ * heure murale) que dans le fuseau du salon (core/time.ts).
  */
 export interface ClockProvider {
   readonly mode: 'demo' | 'system'
   now(): Date
 }
 
-/* ------------------------------------------------------------------ */
-/* Lecture de l'état métier                                             */
-/* ------------------------------------------------------------------ */
-
-/**
- * Vue cohérente de l'état métier dont le cockpit a besoin. Côté Mock, c'est le store
- * local ; côté GHL, ce sera un cache alimenté par l'API et les webhooks.
- */
-export interface NoviaSnapshot {
-  customers: Customer[]
-  appointments: Appointment[]
-  runs: WorkflowRun[]
-  opportunities: Opportunity[]
-  waitlist: WaitlistEntry[]
-  messages: SimulatedMessage[]
-  voice: VoiceSettings
-  conversations: Conversation[]
-  calls: VoiceCall[]
-  settings: NoviaSettings
-}
-
-export interface SyncProvider {
-  getSnapshot(): NoviaSnapshot
-  /** Prévient à chaque changement ; renvoie la fonction de désinscription. */
-  subscribe(listener: () => void): () => void
-}
-
-/* ------------------------------------------------------------------ */
-/* Automatisations NOVIA (SmartFill, récupérations)                     */
-/* ------------------------------------------------------------------ */
-
-export interface SmartFillFunnel {
-  eligible: Customer[]
-  contactable: Customer[]
-}
-
-export interface SmartFillOutcome {
-  appointment: Appointment
-  customer: Customer
-  funnel: SmartFillFunnel
-}
-
-export interface AutomationProvider {
-  /** Qui NOVIA contacterait pour ce créneau libéré, selon les règles. */
-  previewSmartFill(opportunityId: string): SmartFillFunnel | null
-  /** Lance SmartFill sur un créneau libéré. */
-  launchSmartFill(opportunityId: string): SmartFillOutcome | null
-  /** La professionnelle garde le créneau libre : SmartFill ne le propose plus. */
-  closeSmartFill(opportunityId: string): void
-}
-
-/**
- * Contrôles propres à la démonstration : ils simulent le passage du temps ou une
- * réponse de la cliente. Un backend réel ne les fournit pas (champ optionnel).
- */
-export interface DemoControls {
-  advanceRecovery(runId: string): void
-  clientDeclines(runId: string): void
-  clientRebooks(runId: string): Appointment | undefined
-  reset(): void
-}
-
-export interface Providers {
+/** Les fournisseurs techniques d'une entreprise. Tous optionnels sauf l'horloge et la messagerie. */
+export interface TechnicalProviders {
   clock: ClockProvider
-  sync: SyncProvider
-  automation: AutomationProvider
-  demo?: DemoControls
-  booking: BookingProvider
-  settings: SettingsProvider
-  crm: CRMProvider
   messaging: MessagingProvider
-  voice: VoiceProvider
-  payment: PaymentProvider
-  analytics: AnalyticsProvider
+  crm?: CrmMirrorProvider
+  voice?: VoiceProvider
+  payment?: PaymentProvider
+  calendar?: ExternalCalendarProvider
 }

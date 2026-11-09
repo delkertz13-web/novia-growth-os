@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { business } from '../config/business.demo'
+import { business, channelLabels, conversationStateLabels, novia, type ConversationState, type InboxItem } from '../domain'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { approvedAnswersList, channelLabels, conversationStateLabels, novia, type ConversationState, type InboxItem } from '../domain'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, sameDay, useDemoState, useNow } from '../ui/common'
 
@@ -60,12 +59,12 @@ export function Messages() {
 
       <section className="p-section">
         <button className="cf__toggle" aria-expanded={faq} onClick={() => setFaq((v) => !v)}>
-          <span className="p-section__title">Réponses approuvées ({approvedAnswersList().length})</span>
+          <span className="p-section__title">Réponses approuvées ({novia.pro.approvedAnswers().length})</span>
           <Icon name="chevronRight" size={18} className={faq ? 'is-open' : ''} />
         </button>
         {faq && (
           <div className="ops-faq">
-            {approvedAnswersList().map((a) => (
+            {novia.pro.approvedAnswers().map((a) => (
               <div key={a.id} className="ops-faq__item">
                 <strong>{a.topic}</strong>
                 <span>{a.answer}</span>
@@ -152,13 +151,13 @@ export function Conversation() {
     novia.pro.letNoviaHandle(customer.id)
     flash('NOVIA reprend, avec revérification avant tout envoi.')
   }
-  const send = (e: React.FormEvent) => {
+  const send = async (e: React.FormEvent) => {
     e.preventDefault()
-    const r = novia.pro.replyAsPro(c.id, draft)
+    const r = await novia.pro.replyAsPro(c.id, draft)
     if (r.ok) setDraft('')
   }
-  const simulate = (text: string) => {
-    const r = novia.demo?.simulateClientMessage(c.id, text)
+  const simulate = async (text: string) => {
+    const r = await novia.demo?.simulateClientMessage(c.id, text)
     if (r?.ok && r.value.kind === 'faq') flash('NOVIA a répondu avec une réponse approuvée.')
     else if (r?.ok && r.value.kind !== 'human') flash('NOVIA vous passe la main.')
   }

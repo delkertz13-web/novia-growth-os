@@ -1,5 +1,4 @@
-import { cancellationPolicy, faq } from '../config/content.demo'
-import { services } from '../config/services.demo'
+import { content, profile, services } from '../domain'
 import { Notice } from '../ui/common'
 import { ClientFooter } from './ClientLayout'
 import { HoursCard, ServiceRow } from './parts'
@@ -42,7 +41,7 @@ export function Infos() {
         </div>
         <Notice>Réponses de démonstration, non validées par l’établissement.</Notice>
         <div className="faq" style={{ margin: '10px 0 30px' }}>
-          {faq.map((f) => (
+          {content.faq.map((f) => (
             <details key={f.q}>
               <summary>{f.q}</summary>
               <p>{f.a}</p>
@@ -55,7 +54,7 @@ export function Infos() {
             <div className="eyebrow" style={{ marginBottom: 8 }}>
               Annulation
             </div>
-            <p style={{ margin: 0, fontSize: 15 }}>{cancellationPolicy}</p>
+            <p style={{ margin: 0, fontSize: 15 }}>{profile.cancellation.value.text}</p>
           </div>
         </div>
       </div>

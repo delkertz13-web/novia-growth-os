@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { services } from '../config/services.demo'
+import { business, novia, services } from '../domain'
 import { heroSlots, mediaUrl, resolveMedia } from '../media/media'
 import type { MediaAsset } from '../media/types'
-import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Photo } from '../ui/common'
+import { capitalize, fmt, Photo, salon } from '../ui/common'
 import { prefersReducedMotion } from '../ui/motion'
 import { ClientHeader } from './ClientLayout'
 
@@ -15,11 +13,9 @@ function nextFreeSlot(): Date | undefined {
   const active = services.filter((s) => s.active)
   if (!active.length) return undefined
   const shortest = active.reduce((a, b) => (b.durationMin < a.durationMin ? b : a))
-  const day = novia.now()
-  day.setHours(0, 0, 0, 0)
+  const day = salon.startOfDay(novia.now())
   for (let i = 0; i < 14; i++) {
-    const d = new Date(day)
-    d.setDate(day.getDate() + i)
+    const d = salon.addDays(day, i)
     const slot = novia.client.availableSlots(d, shortest.id)[0]
     if (slot) return slot
   }
@@ -146,8 +142,8 @@ export function Hero({ onPassed }: { onPassed?: (passed: boolean) => void }) {
               <span className="hero2__slot-value">
                 {slot ? (
                   <>
-                    <span className="hero2__slot-day">{capitalize(slot.toLocaleDateString('fr-FR', { weekday: 'short' }))} </span>
-                    {slot.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {fmt.time(slot)}
+                    <span className="hero2__slot-day">{capitalize(fmt.date(slot, { weekday: 'short' }))} </span>
+                    {fmt.date(slot, { day: 'numeric', month: 'short' })} · {fmt.time(slot)}
                   </>
                 ) : (
                   'Choisissez votre créneau'
