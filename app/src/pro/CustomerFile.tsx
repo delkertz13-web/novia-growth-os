@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { business } from '../config/business.demo'
+import { business, novia, segmentLabels, serviceById, type TimelineEvent } from '../domain'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { serviceById } from '../config/services.demo'
 import { sourceLabels } from '../core/revenue'
-import { novia, segmentLabels, type TimelineEvent } from '../domain'
 import { Icon, type IconName } from '../ui/Icon'
 import { capitalize, fmt, StatusPill, useDemoState, useNow } from '../ui/common'
 import { RunCard } from './parts'
@@ -55,8 +53,8 @@ export function CustomerFile() {
   const timeline = novia.pro.timeline(c.id, now)
   const shownHistory = allHistory ? timeline.history : timeline.history.slice(0, 6)
 
-  const openConversation = () => {
-    const r = novia.pro.conversationFor(c.id)
+  const openConversation = async () => {
+    const r = await novia.pro.conversationFor(c.id)
     if (r.ok) navigate(`/pro/messages/${r.value.id}`)
   }
   const consent = c.optOut ? 'Opposition (STOP)' : !c.consent.marketing ? 'Rappels seulement' : 'Rappels + offres'
@@ -80,7 +78,7 @@ export function CustomerFile() {
             {c.firstName} {c.lastName}
           </h1>
           <div className="muted">
-            {c.lifecycle === 'prospect' ? 'Prospect' : 'Cliente'} depuis {new Date(c.createdAt).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} · via{' '}
+            {c.lifecycle === 'prospect' ? 'Prospect' : 'Cliente'} depuis {fmt.date(c.createdAt, { month: 'long', year: 'numeric' })} · via{' '}
             {leadLabels[c.source] ?? c.source}
           </div>
           <div className="cf__contact">
@@ -212,7 +210,7 @@ export function CustomerFile() {
             {appointments.map((a) => (
               <Link key={a.id} to={`/pro/rdv/${a.id}`} className="appt">
                 <div className="appt__time">
-                  {new Date(a.start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }).replace('.', '')}
+                  {fmt.date(a.start, { day: 'numeric', month: 'short' }).replace('.', '')}
                   <small>{fmt.time(a.start)}</small>
                 </div>
                 <div style={{ minWidth: 0 }}>

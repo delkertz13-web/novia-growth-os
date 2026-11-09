@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { gallery } from '../../config/content.demo'
-import { serviceById } from '../../config/services.demo'
+import { gallery } from '../../demo/config/content'
+import { serviceById } from '../../demo/config/services'
 import { bookingHref, categoriesWithCount, distinct, filterGallery, noFilters, parseGalleryParams, viewerList } from './model'
 
 describe('galerie · modèle', () => {

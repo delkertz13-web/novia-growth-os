@@ -19,8 +19,8 @@ export function useValidation(onReaction?: (r: Reaction, before: Appointment) =>
   const [error, setError] = useState('')
 
   const run = useCallback(
-    (a: Appointment, outcome: ValidationOutcome, newStart?: Date) => {
-      const res = novia.pro.recordOutcome(a.id, outcome, newStart)
+    async (a: Appointment, outcome: ValidationOutcome, newStart?: Date) => {
+      const res = await novia.pro.recordOutcome(a.id, outcome, newStart)
       if (!res.ok) return setError(res.error)
       setError('')
       if (onReaction) onReaction(res.value, a)
@@ -84,8 +84,8 @@ function ReactionSheet({ r, onClose }: { r: Reaction; onClose: () => void }) {
         <button
           className="btn btn--ghost"
           disabled={paid}
-          onClick={() => {
-            if (novia.pro.recordPaymentProof(a.id).ok) setPaid(true)
+          onClick={async () => {
+            if ((await novia.pro.recordPaymentProof(a.id)).ok) setPaid(true)
           }}
         >
           Simuler une preuve de paiement (fictive)

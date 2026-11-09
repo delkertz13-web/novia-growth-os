@@ -3,8 +3,12 @@
  * Les dates sont calculées par rapport au moment de la présentation pour que
  * « aujourd'hui » soit toujours rempli de façon cohérente.
  */
-import { business } from '../../config/business.demo'
-import { serviceById } from '../../config/services.demo'
+import { initialConsents } from '../core/consent'
+import { addDays, atTime, formatIn, weekday } from '../core/time'
+import { STATE_VERSION, type NoviaState } from '../engine/model'
+import { business } from './config/business'
+import { DEMO_BUSINESS_ID } from './config/profile'
+import { serviceById } from './config/services'
 import type {
   Appointment,
   AppointmentStatus,
@@ -13,51 +17,34 @@ import type {
   LeadSource,
   Opportunity,
   Conversation,
-  NoviaSettings,
   VoiceCall,
   WaitlistEntry,
   WorkflowRun,
-} from '../../core/types'
-import { defaultSettings } from '../../config/novia.demo'
-import type { SimulatedMessage } from '../types'
+} from '../core/types'
+import { defaultSettings } from './config/novia'
 
-export interface DemoState {
-  version: number
-  seededAt: string
-  seq: number
-  customers: Customer[]
-  appointments: Appointment[]
-  runs: WorkflowRun[]
-  opportunities: Opportunity[]
-  waitlist: WaitlistEntry[]
-  messages: SimulatedMessage[]
-  voice: { active: boolean; mode: 'all' | 'missed' | 'after_hours' }
-  conversations: Conversation[]
-  calls: VoiceCall[]
-  settings: NoviaSettings
-}
+/** État de la démo : l'état NOVIA de l'entreprise fictive, plus la date de référence semée. */
+export type DemoState = NoviaState & { seededAt: string }
+export { STATE_VERSION }
 
-export const STATE_VERSION = 7
+/** Les entités sont semées sans entreprise, puis rattachées à l'entreprise de démo. */
+type Seed<T> = Omit<T, 'businessId'>
+const owned = <T,>(xs: Seed<T>[]): T[] => xs.map((x) => ({ businessId: DEMO_BUSINESS_ID, ...x }) as T)
+
+/** Fuseau du salon fictif : le scénario est le même quel que soit le fuseau de l'appareil. */
+const TZ = business.timezone.value
 
 const H = 3_600_000
 const D = 24 * H
 
-const atDay = (base: Date, dayOffset: number, hhmm: string) => {
-  const d = new Date(base)
-  d.setDate(d.getDate() + dayOffset)
-  const [h, m] = hhmm.split(':').map(Number)
-  d.setHours(h, m, 0, 0)
-  return d
-}
+const atDay = (base: Date, dayOffset: number, hhmm: string) => atTime(addDays(base, dayOffset, TZ), hhmm, TZ)
 
 /** k-ième jour d'ouverture après aujourd'hui (les RDV de la semaine tombent toujours un jour ouvert) */
 const atOpenDay = (base: Date, k: number, hhmm: string) => {
   let offset = 0
   for (let found = 0; found < k; ) {
     offset++
-    const d = new Date(base)
-    d.setDate(d.getDate() + offset)
-    if (business.openingHours.value[d.getDay()]) found++
+    if (business.openingHours.value[weekday(addDays(base, offset, TZ), TZ)]) found++
   }
   return atDay(base, offset, hhmm)
 }
@@ -66,9 +53,7 @@ const atOpenDay = (base: Date, k: number, hhmm: string) => {
 const atOpenDayBack = (base: Date, daysAgo: number, hhmm: string) => {
   let offset = -daysAgo
   for (let i = 0; i < 7; i++) {
-    const d = new Date(base)
-    d.setDate(d.getDate() + offset)
-    if (business.openingHours.value[d.getDay()]) break
+    if (business.openingHours.value[weekday(addDays(base, offset, TZ), TZ)]) break
     offset--
   }
   return atDay(base, offset, hhmm)
@@ -76,7 +61,7 @@ const atOpenDayBack = (base: Date, daysAgo: number, hhmm: string) => {
 
 /** prochain vendredi (dans au moins 1 jour) */
 const nextFriday = (now: Date) => {
-  let offset = (5 - now.getDay() + 7) % 7
+  let offset = (5 - weekday(now, TZ) + 7) % 7
   if (offset === 0) offset = 7
   return offset
 }
@@ -122,7 +107,7 @@ export function createSeed(now: Date): DemoState {
   const n = now.getTime()
   let refNo = 100
 
-  const customers: Customer[] = people.map(([id, firstName, lastName, source, extra], i) => ({
+  const customers: Seed<Customer>[] = people.map(([id, firstName, lastName, source, extra], i) => ({
     id,
     firstName,
     lastName,
@@ -135,10 +120,13 @@ export function createSeed(now: Date): DemoState {
     optOut: false,
     humanTakeover: false,
     lastActivityAt: new Date(n - (i + 1) * D).toISOString(),
+    consents: [],
     ...extra,
   }))
+  // registre de consentement cohérent avec l'état fictif de chaque cliente (source « demo »)
+  for (const c of customers) c.consents = initialConsents(`${c.id}-consent`, c.createdAt, c, 'demo', 'Donnée fictive de démonstration')
 
-  const appointments: Appointment[] = []
+  const appointments: Seed<Appointment>[] = []
   const add = (
     customerId: string,
     serviceId: string,
@@ -147,7 +135,7 @@ export function createSeed(now: Date): DemoState {
     o: { attribution?: AttributionSource; paid?: boolean; origin?: Appointment['bookingOrigin']; bookedAt?: Date } = {},
   ) => {
     const s = serviceById(serviceId)!
-    const a: Appointment = {
+    const a: Seed<Appointment> = {
       id: `a${refNo}`,
       ref: `A${refNo}`,
       customerId,
@@ -232,7 +220,7 @@ export function createSeed(now: Date): DemoState {
   Object.assign(customer('c24'), { createdAt: callSarahAt.toISOString(), lastActivityAt: callSarahAt.toISOString(), phone: '06 00 00 77 18', email: 'sarah.benoit@exemple.demo' })
 
   /* ---------- Workflows en cours (démo) ---------- */
-  const runs: WorkflowRun[] = [
+  const runs: Seed<WorkflowRun>[] = [
     {
       id: 'run-seed-w04-c12',
       workflow: 'W04',
@@ -282,14 +270,14 @@ export function createSeed(now: Date): DemoState {
     },
   ]
 
-  const opportunities: Opportunity[] = [
+  const opportunities: Seed<Opportunity>[] = [
     { id: 'o-ns-c12', kind: 'noshow_recovery', amount: 45, status: 'won', createdAt: ns1.start, sourceAppointmentId: ns1.id, resultAppointmentId: rec.id },
     { id: 'o-ns-c13', kind: 'noshow_recovery', amount: 35, status: 'open', createdAt: ns2.start, sourceAppointmentId: ns2.id },
     { id: 'o-cx-c11', kind: 'cancellation_recovery', amount: 45, status: 'open', createdAt: new Date(n - 5 * H).toISOString(), sourceAppointmentId: cancelled.id },
     { id: 'o-sf-slot', kind: 'smartfill', amount: 45, status: 'open', createdAt: new Date(n - 5 * H).toISOString(), sourceAppointmentId: cancelled.id, slotStart: slot.toISOString(), slotDurationMin: 60 },
   ]
 
-  const waitlist: WaitlistEntry[] = [
+  const waitlist: Seed<WaitlistEntry>[] = [
     { id: 'w1', customerId: 'c18', serviceId: 'remplissage', days: [5, 6], periods: ['apres-midi'], flexible: true, createdAt: new Date(n - 3 * D).toISOString() },
     { id: 'w2', customerId: 'c19', serviceId: 'semi-permanent', days: [4, 5], periods: ['apres-midi', 'soir'], flexible: false, createdAt: new Date(n - 2 * D).toISOString() },
     { id: 'w3', customerId: 'c20', serviceId: 'remplissage', days: [5], periods: ['apres-midi'], flexible: true, createdAt: new Date(n - 5 * D).toISOString() },
@@ -298,18 +286,22 @@ export function createSeed(now: Date): DemoState {
 
   return {
     version: STATE_VERSION,
+    businessId: DEMO_BUSINESS_ID,
     seededAt: now.toISOString(),
     seq: refNo,
-    customers,
-    appointments,
-    runs,
-    opportunities,
-    waitlist,
+    customers: owned<Customer>(customers),
+    appointments: owned<Appointment>(appointments),
+    runs: owned<WorkflowRun>(runs),
+    opportunities: owned<Opportunity>(opportunities),
+    waitlist: owned<WaitlistEntry>(waitlist),
     messages: [],
     voice: { active: true, mode: 'missed' },
-    conversations: seedConversations(now, t2 + 6 * H),
-    calls: seedCalls(now, { sarah: sarahRdv.id, yasmine: appointments.find((a) => a.customerId === 'c07')!.id }),
+    conversations: owned<Conversation>(seedConversations(now, t2 + 6 * H)),
+    calls: owned<VoiceCall>(seedCalls(now, { sarah: sarahRdv.id, yasmine: appointments.find((a) => a.customerId === 'c07')!.id })),
     settings: structuredClone(defaultSettings),
+    outbox: [],
+    inbox: [],
+    journal: [],
   }
 }
 
@@ -317,8 +309,8 @@ export function createSeed(now: Date): DemoState {
 /* Conversations de démonstration                                       */
 /* ------------------------------------------------------------------ */
 
-function seedConversations(now: Date, oceaneMsgAt: number): Conversation[] {
-  const missed = new Date(oceaneMsgAt).toLocaleDateString('fr-FR', { weekday: 'long' })
+function seedConversations(now: Date, oceaneMsgAt: number): Seed<Conversation>[] {
+  const missed = formatIn(new Date(oceaneMsgAt), TZ, { weekday: 'long' })
   const n = now.getTime()
   const at = (minAgo: number) => new Date(n - minAgo * 60_000).toISOString()
   let k = 0
@@ -396,7 +388,7 @@ function seedConversations(now: Date, oceaneMsgAt: number): Conversation[] {
 /* Appels NOVIA Voice de démonstration (fictifs)                        */
 /* ------------------------------------------------------------------ */
 
-function seedCalls(now: Date, ids: { sarah: string; yasmine: string }): VoiceCall[] {
+function seedCalls(now: Date, ids: { sarah: string; yasmine: string }): Seed<VoiceCall>[] {
   const n = now.getTime()
   const today = (hhmm: string) => atDay(now, 0, hhmm).toISOString()
   return [

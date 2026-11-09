@@ -1,4 +1,4 @@
-import type { FaqItem, GalleryCategory, GalleryItem, NailLength, NailShape, ReviewItem } from './schema'
+import type { FaqItem, GalleryCategory, GalleryItem, ReviewItem } from '../../config/schema'
 
 /**
  * GALERIE — 12 emplacements. Chaque `id` correspond à un fichier déposé dans
@@ -6,30 +6,6 @@ import type { FaqItem, GalleryCategory, GalleryItem, NailLength, NailShape, Revi
  * (voir app/media-source/README.md). Sans visuel, un placeholder clairement
  * identifié s'affiche à la place.
  */
-export const galleryCategories: { id: GalleryCategory; label: string }[] = [
-  { id: 'pose-complete', label: 'Pose complète' },
-  { id: 'gel', label: 'Gel' },
-  { id: 'french', label: 'French' },
-  { id: 'nude', label: 'Nude' },
-  { id: 'nail-art', label: 'Nail art' },
-  { id: 'semi-permanent', label: 'Semi-permanent' },
-]
-
-export const shapeLabels: Record<NailShape, string> = {
-  amande: 'Amande',
-  carree: 'Carrée',
-  ballerine: 'Ballerine',
-  ovale: 'Ovale',
-  stiletto: 'Stiletto',
-  squoval: 'Squoval',
-}
-
-export const lengthLabels: Record<NailLength, string> = {
-  courte: 'Courte',
-  moyenne: 'Moyenne',
-  longue: 'Longue',
-}
-
 export const gallery: GalleryItem[] = [
   { id: 'g-pose-01', title: 'French blanche', category: 'french', shape: 'amande', length: 'longue', alt: 'French blanche classique sur ongles amande longs, base nude' },
   { id: 'g-pose-02', title: 'Bordeaux filets d’or', category: 'gel', shape: 'amande', length: 'longue', alt: 'Gel bordeaux brillant, un ongle orné de fins filets dorés en volute' },

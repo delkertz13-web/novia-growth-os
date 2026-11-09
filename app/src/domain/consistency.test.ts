@@ -5,16 +5,18 @@
  *   - l'effet attendu sur les indicateurs (voir KPI.md).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { rules } from '../config/rules.demo'
-import { services } from '../config/services.demo'
+import { addDays } from '../core/time'
+import { rules } from '../demo/config/rules'
 import { appointmentEnd, isActiveBooking } from '../core/appointmentStatus'
 import { appointmentLevel, computeRevenue } from '../core/revenue'
 import { isWithinSendWindow } from '../core/workflows'
-import { providers } from '../providers/mock'
-import type { NoviaSnapshot } from '../providers/types'
-import { createNovia } from './intents'
+import { createDemoNovia } from '../app/demo'
+import type { NoviaSnapshot } from '../engine/model'
 
-const novia = createNovia(providers, { rules, services })
+/** fuseau du salon de démonstration */
+const TZ = 'Europe/Paris'
+
+const novia = createDemoNovia()
 const now = () => novia.now()
 const kpi = () => novia.pro.cockpit(now()).revenue
 const snap = () => novia.snapshot()
@@ -86,7 +88,7 @@ let moment = moments[0][1]
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(moment))
-  providers.demo!.reset()
+  novia.demo!.reset()
   vi.stubGlobal('fetch', network.fetch)
   vi.stubGlobal('XMLHttpRequest', network.xhr)
   vi.stubGlobal('WebSocket', network.ws)
@@ -110,31 +112,31 @@ describe.each(moments)('%s', (_label, iso) => {
   beforeEach(() => {
     moment = iso
     vi.setSystemTime(new Date(iso))
-    providers.demo!.reset()
+    novia.demo!.reset()
   })
 
   describe('Présence', () => {
-    it('Présente : statut attesté, aucune séquence, reste en CA réservé ; la preuve le passe en confirmé', () => {
+    it('Présente : statut attesté, aucune séquence, reste en CA réservé ; la preuve le passe en confirmé', async () => {
       const a = awaiting(45)
       const before = kpi()
       const msgs = snap().messages.length
-      ok(novia.pro.confirmPresence(a.id))
+      ok(await novia.pro.confirmPresence(a.id))
       expect(appt(a.id).status).toBe('showed')
       expect(snap().runs.some((r) => r.appointmentId === a.id)).toBe(false)
       expect(snap().messages.length).toBe(msgs)
       expect(kpi().toRecover).toBe(before.toRecover)
 
       const r0 = novia.pro.revenueAttribution().totals
-      ok(novia.pro.recordPaymentProof(a.id))
+      ok(await novia.pro.recordPaymentProof(a.id))
       const r1 = novia.pro.revenueAttribution().totals
       expect(r1.confirmed - r0.confirmed).toBe(45)
       expect(r0.booked - r1.booked).toBe(45)
     })
 
-    it('Absente : W04 démarre, une seule opportunité, +45 € à récupérer, rien gagné', () => {
+    it('Absente : W04 démarre, une seule opportunité, +45 € à récupérer, rien gagné', async () => {
       const a = awaiting(45)
       const before = kpi()
-      const reaction = ok(novia.pro.declareAbsence(a.id))
+      const reaction = ok(await novia.pro.declareAbsence(a.id))
       expect(appt(a.id).status).toBe('no_show')
       expect(snap().runs.filter((r) => r.appointmentId === a.id && r.state === 'active').map((r) => r.workflow)).toEqual(['W04'])
       expect(snap().opportunities.filter((o) => o.sourceAppointmentId === a.id && o.status === 'open')).toHaveLength(1)
@@ -143,33 +145,33 @@ describe.each(moments)('%s', (_label, iso) => {
       expect(reaction.runId).toBeDefined()
     })
 
-    it('Absente puis correction en Présente : la séquence s’arrête, le potentiel revient', () => {
+    it('Absente puis correction en Présente : la séquence s’arrête, le potentiel revient', async () => {
       const a = awaiting(45)
       const before = kpi().toRecover
-      ok(novia.pro.declareAbsence(a.id))
-      ok(novia.pro.confirmPresence(a.id))
+      ok(await novia.pro.declareAbsence(a.id))
+      ok(await novia.pro.confirmPresence(a.id))
       expect(appt(a.id).status).toBe('showed')
       expect(snap().runs.find((r) => r.appointmentId === a.id)!.state).toBe('stopped')
       expect(kpi().toRecover).toBe(before)
     })
 
-    it('déclarer deux fois la même absence est refusé, sans seconde séquence', () => {
+    it('déclarer deux fois la même absence est refusé, sans seconde séquence', async () => {
       const a = awaiting(45)
-      ok(novia.pro.declareAbsence(a.id))
-      expect(novia.pro.declareAbsence(a.id).ok).toBe(false)
+      ok(await novia.pro.declareAbsence(a.id))
+      expect((await novia.pro.declareAbsence(a.id)).ok).toBe(false)
       expect(snap().runs.filter((r) => r.appointmentId === a.id)).toHaveLength(1)
     })
 
-    it('une absence ne peut pas être déclarée sur un RDV pas encore commencé', () => {
-      expect(novia.pro.declareAbsence(futureBooking().id).ok).toBe(false)
+    it('une absence ne peut pas être déclarée sur un RDV pas encore commencé', async () => {
+      expect((await novia.pro.declareAbsence(futureBooking().id)).ok).toBe(false)
     })
   })
 
   describe('Annulation et report', () => {
-    it('Annulée (à venir) : créneau libéré pour SmartFill, compté UNE fois en potentiel', () => {
+    it('Annulée (à venir) : créneau libéré pour SmartFill, compté UNE fois en potentiel', async () => {
       const a = futureBooking()
       const before = novia.pro.cockpit(now())
-      ok(novia.pro.cancelAppointment(a.id))
+      ok(await novia.pro.cancelAppointment(a.id))
       const after = novia.pro.cockpit(now())
       expect(appt(a.id).status).toBe('cancelled')
       expect(after.freedSlots.length - before.freedSlots.length).toBe(1)
@@ -177,47 +179,42 @@ describe.each(moments)('%s', (_label, iso) => {
       expect(novia.pro.availableSlots(new Date(a.start), a.serviceId).some((d) => d.getTime() === new Date(a.start).getTime())).toBe(true)
     })
 
-    it('Reportée : l’ancien RDV est remplacé, le CA réservé ne double pas', () => {
+    it('Reportée : l’ancien RDV est remplacé, le CA réservé ne double pas', async () => {
       const a = futureBooking()
       const before = novia.pro.revenueAttribution().totals.booked
-      const day = new Date(a.start)
-      day.setDate(day.getDate() + 7)
-      const slot = Array.from({ length: 10 }, (_, i) => {
-        const d = new Date(day)
-        d.setDate(d.getDate() + i)
-        return novia.pro.availableSlots(d, a.serviceId)[0]
-      }).find(Boolean)!
-      const reaction = ok(novia.pro.rescheduleAppointment(a.id, slot))
+      const day = addDays(new Date(a.start), 7, TZ)
+      const slot = Array.from({ length: 10 }, (_, i) => novia.pro.availableSlots(addDays(day, i, TZ), a.serviceId)[0]).find(Boolean)!
+      const reaction = ok(await novia.pro.rescheduleAppointment(a.id, slot))
       expect(appt(a.id).status).toBe('rescheduled')
       expect(appt(reaction.resultAppointmentId).start).toBe(slot.toISOString())
       expect(novia.pro.revenueAttribution().totals.booked).toBe(before)
-      expect(novia.pro.confirmPresence(a.id).ok).toBe(false)
+      expect((await novia.pro.confirmPresence(a.id)).ok).toBe(false)
     })
   })
 
   describe('Récupération', () => {
     const activeW04 = () => snap().runs.find((r) => r.workflow === 'W04' && r.state === 'active')!
 
-    it('la cliente reprend RDV : séquence close, opportunité gagnée, potentiel → gagné par NOVIA', () => {
+    it('la cliente reprend RDV : séquence close, opportunité gagnée, potentiel → gagné par NOVIA', async () => {
       const run = activeW04()
       const src = appt(run.appointmentId!)
       const pot0 = kpi().toRecover
       const won0 = novia.pro.revenueAttribution().bySource.noshow_recovery.booked
-      const a = providers.demo!.clientRebooks(run.id)!
+      const a = (await novia.demo!.clientRebooks(run.id))!
       expect(snap().runs.find((r) => r.id === run.id)!.outcome).toBe('recovered')
       expect(appt(a.id).attribution).toBe('noshow_recovery')
       expect(pot0 - kpi().toRecover).toBe(src.price)
       expect(novia.pro.revenueAttribution().bySource.noshow_recovery.booked - won0).toBe(src.price)
     })
 
-    it('sans réponse : au plus un message et une dernière relance, puis arrêt et potentiel perdu', () => {
+    it('sans réponse : au plus un message et une dernière relance, puis arrêt et potentiel perdu', async () => {
       const run = activeW04()
       const pot0 = kpi().toRecover
       const msgs0 = run.messagesSent
-      for (let i = 0; i < 5; i++) providers.demo!.advanceRecovery(run.id)
+      for (let i = 0; i < 5; i++) await novia.demo!.advanceRecovery(run.id)
       const done = snap().runs.find((r) => r.id === run.id)!
       expect(done.messagesSent).toBeLessThanOrEqual(2)
-      if (isWithinSendWindow(now(), rules.sendWindow)) {
+      if (isWithinSendWindow(now(), rules.sendWindow, novia.timeZone)) {
         expect(done.state).toBe('stopped')
         expect(pot0 - kpi().toRecover).toBe(appt(run.appointmentId!).price)
       } else {
@@ -228,11 +225,11 @@ describe.each(moments)('%s', (_label, iso) => {
       }
     })
 
-    it('reprise de la conversation : NOVIA n’envoie plus rien à cette cliente', () => {
+    it('reprise de la conversation : NOVIA n’envoie plus rien à cette cliente', async () => {
       const run = activeW04()
-      ok(novia.pro.takeOverConversation(run.customerId))
+      ok(await novia.pro.takeOverConversation(run.customerId))
       const msgs = snap().messages.length
-      providers.demo!.advanceRecovery(run.id)
+      await novia.demo!.advanceRecovery(run.id)
       expect(snap().messages.length).toBe(msgs)
       expect(novia.pro.cockpit(now()).takenOver.some((c) => c.id === run.customerId)).toBe(true)
     })
@@ -241,23 +238,23 @@ describe.each(moments)('%s', (_label, iso) => {
   describe('SmartFill', () => {
     const slot = () => novia.pro.cockpit(now()).freedSlots[0]
 
-    it('lancer : une cliente contactable réserve le créneau, attribué à SmartFill, une seule fois', () => {
+    it('lancer : une cliente contactable réserve le créneau, attribué à SmartFill, une seule fois', async () => {
       const o = slot()
       const before = novia.pro.cockpit(now())
-      const res = ok(novia.pro.launchSmartFill(o.id))!
+      const res = ok(await novia.pro.launchSmartFill(o.id))!
       expect(res.customer.optOut || res.customer.humanTakeover || !res.customer.consent.marketing).toBe(false)
       expect(res.appointment.start).toBe(o.slotStart)
       expect(appt(res.appointment.id).attribution).toBe('smartfill')
       const after = novia.pro.cockpit(now())
       expect(after.freedSlots).toHaveLength(before.freedSlots.length - 1)
       expect(before.revenue.toRecover - after.revenue.toRecover).toBe(o.amount)
-      expect(ok(novia.pro.launchSmartFill(o.id))).toBeNull()
+      expect(ok(await novia.pro.launchSmartFill(o.id))).toBeNull()
     })
 
-    it('garder le créneau libre : SmartFill ne le propose plus ; la relance de la cliente reste à récupérer', () => {
+    it('garder le créneau libre : SmartFill ne le propose plus ; la relance de la cliente reste à récupérer', async () => {
       const o = slot()
       const before = novia.pro.cockpit(now())
-      ok(novia.pro.keepSlotFree(o.id))
+      ok(await novia.pro.keepSlotFree(o.id))
       const after = novia.pro.cockpit(now())
       expect(after.freedSlots).toHaveLength(before.freedSlots.length - 1)
       expect(after.revenue.toRecover).toBe(before.revenue.toRecover)
@@ -266,7 +263,7 @@ describe.each(moments)('%s', (_label, iso) => {
 })
 
 describe('Démonstration : rien de réel ne part', () => {
-  it('le code de l’application ne contient aucun appel réseau', () => {
+  it('le code de l’application ne contient aucun appel réseau', async () => {
     const sources = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
     expect(Object.keys(sources).length).toBeGreaterThan(30)
     const offenders = Object.entries(sources)
@@ -275,12 +272,14 @@ describe('Démonstration : rien de réel ne part', () => {
     expect(offenders).toEqual([])
   })
 
-  it('les messages sont seulement consignés, les paiements seulement fictifs', () => {
+  it('les messages sont seulement consignés, les paiements seulement fictifs', async () => {
     const a = awaiting(45)
-    ok(novia.pro.confirmPresence(a.id))
-    const proof = ok(novia.pro.recordPaymentProof(a.id))
+    ok(await novia.pro.confirmPresence(a.id))
+    const proof = ok(await novia.pro.recordPaymentProof(a.id))
     expect(proof.kind).toBe('demo_payment')
-    const m = providers.messaging.simulateSend({ to: 'Test', channel: 'sms', purpose: 'test', body: 'x' })
-    expect(snap().messages[0].id).toBe(m.id)
+    // contrat V2 : le message décidé par NOVIA est remis au provider Mock, qui le consigne sans rien transmettre
+    const slot = novia.pro.availableSlots(new Date(a.start), a.serviceId)[0] ?? novia.client.availableSlots(new Date(new Date(a.start).getTime() + 86_400_000), a.serviceId)[0]
+    const b = ok(await novia.client.book({ serviceId: a.serviceId, start: slot, contact: { firstName: 'Test', lastName: 'Démo', phone: '06 99 99 99 99', email: 'test@exemple.demo' }, source: 'site', origin: 'site' }))
+    expect(snap().messages[0]).toMatchObject({ appointmentId: b.id, status: 'simulated', idempotencyKey: `W02:confirmation:${b.id}` })
   })
 })

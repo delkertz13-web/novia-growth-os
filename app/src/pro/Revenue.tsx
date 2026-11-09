@@ -4,7 +4,7 @@ import { Icon } from '../ui/Icon'
 import { formatEUR, levelLabels, sourceLabels, type RevenueLevel } from '../core/revenue'
 import type { AttributionSource } from '../core/types'
 import { novia } from '../domain'
-import { Notice, useDemoState, useNow } from '../ui/common'
+import { fmt, Notice, salon, useDemoState, useNow } from '../ui/common'
 
 const defs: Record<RevenueLevel, string> = {
   potential: 'Ce que NOVIA peut encore regagner : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
@@ -18,8 +18,7 @@ export function Revenue() {
   useDemoState()
   const now = useNow()
   const [period, setPeriod] = useState<'month' | 'all'>('month')
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const { from, to } = salon.monthOf(now)
   const r = novia.pro.revenueAttribution(period === 'month' ? { from, to } : undefined)
   const levels: RevenueLevel[] = ['potential', 'booked', 'confirmed']
   const cell = (n: number) => <td className={n ? '' : 'zero'}>{n ? formatEUR(n) : '—'}</td>
@@ -39,7 +38,7 @@ export function Revenue() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
         <div className="seg" role="tablist" aria-label="Période">
           <button className={period === 'month' ? 'is-active' : ''} onClick={() => setPeriod('month')}>
-            {now.toLocaleDateString('fr-FR', { month: 'long' })}
+            {fmt.date(now, { month: 'long' })}
           </button>
           <button className={period === 'all' ? 'is-active' : ''} onClick={() => setPeriod('all')}>
             Tout l’historique démo

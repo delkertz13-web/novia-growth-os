@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { callOutcomeLabels, filterCalls, novia, voiceModeLabels, type CallFilter, type VoiceCall, type VoiceMode } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, sameDay, Sheet, useDemoState, useNow } from '../ui/common'
+import { capitalize, fmt, salon, sameDay, Sheet, useDemoState, useNow } from '../ui/common'
 import { StatTile } from './parts'
 
 const filters: { id: CallFilter; label: string }[] = [
@@ -11,10 +11,8 @@ const filters: { id: CallFilter; label: string }[] = [
   { id: 'after_hours', label: 'Hors horaires' },
 ]
 
-const dayKey = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** jour du salon, pour ouvrir l'agenda sur ce jour */
+const dayKey = (iso: string) => salon.dayKey(new Date(iso))
 const duration = (s: number) => `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}`
 
 /** Standard téléphonique NOVIA — entièrement simulé. */
@@ -140,8 +138,8 @@ function LiveCall({ onBooked, onError }: { onBooked: (callId: string) => void; o
       return () => clearTimeout(t)
     }
     setPhase('booking')
-    const t = setTimeout(() => {
-      const r = novia.demo?.simulateIncomingCall()
+    const t = setTimeout(async () => {
+      const r = await novia.demo?.simulateIncomingCall()
       if (r?.ok) onBooked(r.value.call.id)
       else onError(r && !r.ok ? r.error : 'Appel impossible')
     }, reduced() ? 0 : 900)
