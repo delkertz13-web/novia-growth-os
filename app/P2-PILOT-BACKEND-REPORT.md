@@ -450,11 +450,11 @@ La démo reste **indépendante** : pas de serveur, pas de PostgreSQL, pas d'auth
 ## 24. État exact de la PR
 
 - **Branche :** `pilot/p2-backend`, partie de `0d8690f` (P1 fusionné).
-- **PR :** ouverte vers `claude/project-thread-lcup8r`, **non fusionnée**. Elle attend ta validation.
+- **PR :** #5 (https://github.com/delkertz13-web/novia-growth-os/pull/5), ouverte vers `claude/project-thread-lcup8r`, **non fusionnée**. Elle attend ta validation.
 - **Toutes les vérifications sont vertes :**
   - typecheck front et serveur ;
   - 250 tests, plus la matrice des fuseaux ;
   - builds démo, pilote et serveur ;
   - parcours démo 33/33 et KPI ;
   - parcours pilote réel 14/14.
-- Tout ce qui précède est vrai au moment de l'ouverture de la PR. Le numéro de la PR est donné dans le message qui accompagne ce rapport.
+
