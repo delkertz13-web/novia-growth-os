@@ -24,6 +24,11 @@ export interface EngineOptions<S extends NoviaState> {
   profile: BusinessProfile
   providers: TechnicalProviders
   execution: ExecutionMode
+  /**
+   * inline (défaut, démo et tests) : les envois décidés sont traités tout de suite ;
+   * deferred (serveur) : ils restent dans l'outbox, traitée ensuite par le worker.
+   */
+  dispatch?: 'inline' | 'deferred'
 }
 
 /** Entrée sans enveloppe : le moteur complète source, date et identifiant. */
@@ -33,7 +38,7 @@ const targetAppointment = (input: NoviaInput) =>
   'appointmentId' in input && (input.type === 'AttendanceRecorded' || input.type === 'BookingCancelled' || input.type === 'BookingRescheduled') ? input.appointmentId : undefined
 
 export function createEngine<S extends NoviaState>(opts: EngineOptions<S>) {
-  const { store, profile, providers, execution } = opts
+  const { store, profile, providers, execution, dispatch = 'inline' } = opts
   if (store.businessId !== profile.businessId) throw new Error('Isolation : le store et le profil ne désignent pas la même entreprise.')
   const ctx = { profile, execution, has: { crm: !!providers.crm, voice: !!providers.voice } }
   let counter = 0
@@ -84,7 +89,7 @@ export function createEngine<S extends NoviaState>(opts: EngineOptions<S>) {
       if (e instanceof EngineError || e instanceof ValidationError || e instanceof ConsentError) return { ok: false, error: e.message, code: 'rejected' }
       return { ok: false, error: e instanceof Error ? e.message : 'Action impossible', code: 'internal' }
     }
-    await flush()
+    if (dispatch === 'inline') await flush()
     return result
   }
 

@@ -79,6 +79,33 @@ async function deliver(entry: OutboxEntry, s: NoviaState, p: TechnicalProviders,
   }
 }
 
+/** Ce que NOVIA aurait fait, avec les gardes lues sur l'état courant (mode shadow). */
+function shadowDecision(s: NoviaState, entry: OutboxEntry): Pick<JournalEntry, 'customerId' | 'appointmentId' | 'decision'> {
+  const m = entry.kind === 'message' ? s.messages.find((x) => x.id === entry.ref) : undefined
+  const conv = entry.kind === 'conversation_reply' ? s.conversations.find((c) => c.messages.some((x) => x.id === entry.ref)) : undefined
+  const customerId = m?.customerId ?? conv?.customerId ?? (entry.kind.startsWith('crm') ? entry.ref : undefined)
+  const c = s.customers.find((x) => x.id === customerId)
+  const workflow = /^(W0\d)/.exec(entry.key)?.[1] ?? (entry.kind === 'conversation_reply' ? 'Conversation' : entry.kind.split('.')[0].toUpperCase())
+  const what = m ? `le message « ${m.purpose} »` : entry.kind === 'conversation_reply' ? 'la réponse de conversation' : `l’écriture ${entry.kind}`
+  return {
+    customerId,
+    appointmentId: m?.appointmentId,
+    decision: {
+      workflow,
+      action: `${entry.kind} · ${entry.key}`,
+      result: 'WOULD_EXECUTE',
+      reason: `NOVIA aurait envoyé ${what} (mode shadow : rien n’est sorti du serveur).`,
+      guards: c
+        ? [
+            { name: 'consentement aux messages', ok: c.consent.transactional },
+            { name: 'pas d’opposition (STOP)', ok: !c.optOut },
+            { name: 'pas de reprise humaine', ok: !c.humanTakeover },
+          ]
+        : undefined,
+    },
+  }
+}
+
 /** Reporte le résultat d'un envoi sur la file, le message et le journal. */
 function apply(s: NoviaState, entry: OutboxEntry, outcome: Outcome, at: string): NoviaState {
   const attempts = entry.attempts + (outcome.kind === 'shadow' ? 0 : 1)
@@ -88,7 +115,7 @@ function apply(s: NoviaState, entry: OutboxEntry, outcome: Outcome, at: string):
   if (outcome.kind === 'shadow') {
     status = 'shadow'
     delivery = 'shadow'
-    journal.push({ at, kind: 'would_send', label: `Mode shadow : NOVIA aurait exécuté « ${entry.kind} » (${entry.key}).` })
+    journal.push({ at, kind: 'would_send', label: `Mode shadow : NOVIA aurait exécuté « ${entry.kind} » (${entry.key}).`, ...shadowDecision(s, entry) })
   } else if (outcome.kind === 'done') {
     status = 'done'
     delivery = outcome.status

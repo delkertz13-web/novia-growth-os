@@ -106,6 +106,8 @@ export interface Customer {
   referrerId?: string
   noShowRecovered?: boolean
   externalRefs?: ExternalRef[]
+  /** données personnelles effacées (droit à l'effacement) : la fiche ne garde que l'historique utile */
+  anonymizedAt?: string
 }
 
 /* ------------------------------------------------------------------ */
