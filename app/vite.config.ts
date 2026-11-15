@@ -29,8 +29,22 @@ function preloadHero(): Plugin {
   }
 }
 
+/**
+ * NOVIA_MODE : `demo` (par défaut, démonstration commerciale intacte) ou `pilot`.
+ * Un seul code, deux compositions : le build pilote ne contient pas src/demo.
+ */
+declare const process: { env: Record<string, string | undefined> }
+const noviaMode = process.env.VITE_NOVIA_MODE === 'pilot' ? 'pilot' : 'demo'
+const src = (path: string) => decodeURIComponent(new URL(`./src/${path}`, import.meta.url).pathname)
+
 export default defineConfig({
   plugins: [react(), preloadHero()],
+  resolve: {
+    alias: {
+      '@novia/runtime': src(`app/${noviaMode}.ts`),
+      '@novia/shell': src(`app/${noviaMode}-shell.tsx`),
+    },
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

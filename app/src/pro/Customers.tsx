@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { serviceById } from '../config/services.demo'
-import { filterCustomers, novia, segmentCounts, segmentHelp, segmentLabels, type CustomerRow, type Segment } from '../domain'
+import { filterCustomers, novia, segmentCounts, segmentHelp, segmentLabels, serviceById, type CustomerRow, type Segment } from '../domain'
 import { Icon } from '../ui/Icon'
 import { fmt, useDemoState, useNow } from '../ui/common'
 

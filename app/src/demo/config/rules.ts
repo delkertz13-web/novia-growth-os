@@ -1,4 +1,4 @@
-import type { WorkflowRules } from './schema'
+import type { WorkflowRules } from '../../config/schema'
 
 /**
  * Paramètres W01–W04 de DÉMONSTRATION (cf. docs/02_WORKFLOWS et docs/01_CORE/MASTER_CONFIG.md).

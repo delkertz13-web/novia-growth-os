@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { serviceById, services } from '../config/services.demo'
+import { novia, serviceById, services, type SmartFillFunnel } from '../domain'
 import { formatEUR } from '../core/revenue'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, Customer, Opportunity } from '../core/types'
-import { novia, type SmartFillFunnel } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
+import { capitalize, fmt, salon, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
 import { customerName, RunCard, StatTile } from './parts'
 
-const dayKey = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+/** jour du salon, pour ouvrir l'agenda sur ce jour */
+const dayKey = (iso: string) => salon.dayKey(new Date(iso))
 
 export function Novia() {
   const st = useDemoState()
@@ -185,8 +182,8 @@ function SmartFillSheet({ id, opportunity: o, onClose }: { id: string | null; op
     // photo de l'entonnoir AVANT la réservation simulée
     setSnapshot(novia.pro.previewSmartFill(o.id))
     setPhase('running')
-    setTimeout(() => {
-      const r = novia.pro.launchSmartFill(o.id)
+    setTimeout(async () => {
+      const r = await novia.pro.launchSmartFill(o.id)
       if (r.ok && r.value) {
         setWinner(r.value.customer)
         setBooked(r.value.appointment)

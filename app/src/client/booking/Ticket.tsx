@@ -1,5 +1,4 @@
-import { business } from '../../config/business.demo'
-import { rules } from '../../config/rules.demo'
+import { business, profile } from '../../domain'
 import type { GalleryItem, ServiceConfig } from '../../config/schema'
 import type { Appointment } from '../../core/types'
 import { resolveMedia } from '../../media/media'
@@ -101,7 +100,7 @@ const followUpWhen = (f: FollowUp) => {
 
 /** Ce que NOVIA ferait ensuite (W02 de démo) : affiché seulement une fois la réservation posée. */
 export function NextSteps({ appointment, bookedAt }: { appointment: Appointment; bookedAt: Date }) {
-  const list = followUps(appointment, rules, bookedAt)
+  const list = followUps(appointment, profile.rules, bookedAt)
   return (
     <section className="nx" aria-label="Ce que NOVIA fait ensuite">
       <div className="nx__head">

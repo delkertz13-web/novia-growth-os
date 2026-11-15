@@ -1,20 +1,19 @@
-/** Erreur levée par toute implémentation préparée mais non branchée. */
-export class NotConnectedError extends Error {
-  constructor(provider: string, method: string) {
-    super(`${provider}.${method} : intégration préparée mais non connectée (démonstration).`)
-    this.name = 'NotConnectedError'
-  }
-}
+import type { ProviderError, ProviderResult } from './types'
+
+/** Erreur typée renvoyée par tout provider préparé mais non branché (jamais retentable). */
+export const notConnectedError = (provider: string, method: string): ProviderError => ({
+  provider,
+  code: 'not_connected',
+  message: `${provider}.${method} : intégration préparée mais non connectée.`,
+  retryable: false,
+})
 
 /**
- * Construit un objet dont chaque méthode lève NotConnectedError. Le typage garantit
- * que la future implémentation couvre exactement l'interface attendue.
+ * Construit un provider dont chaque méthode répond `not_connected`, sans exception ni
+ * appel réseau. Le typage garantit que la future implémentation couvre exactement le contrat.
  */
-export function notConnected<T extends object>(provider: string, methods: { [K in keyof T]-?: true }): T {
-  const out: Record<string, () => never> = {}
-  for (const m of Object.keys(methods))
-    out[m] = () => {
-      throw new NotConnectedError(provider, m)
-    }
+export function notConnected<T extends { readonly name: string }>(name: string, methods: { [K in Exclude<keyof T, 'name'>]-?: true }): T {
+  const out: Record<string, unknown> = { name }
+  for (const m of Object.keys(methods)) out[m] = async (): Promise<ProviderResult<never>> => ({ ok: false, error: notConnectedError(name, m) })
   return out as T
 }

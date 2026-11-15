@@ -13,7 +13,11 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "types": ["vite/client", "vitest/importMeta"]
+    "types": ["vite/client", "vitest/importMeta"],
+    "paths": {
+      "@novia/runtime": ["./src/app/demo.ts"],
+      "@novia/shell": ["./src/app/demo-shell.tsx"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

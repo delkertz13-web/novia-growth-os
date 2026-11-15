@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { gallery, galleryById, galleryCategories, lengthLabels, shapeLabels } from '../config/content.demo'
+import { galleryCategories, lengthLabels, shapeLabels } from '../config/vertical'
+import { content, galleryById } from '../domain'
 import type { GalleryCategory, NailLength, NailShape } from '../config/schema'
 import { hasFictionalMedia, provenanceNote } from '../media/media'
 import { Icon } from '../ui/Icon'
@@ -34,14 +35,14 @@ export function Gallery() {
   const [length, setLength] = useState<NailLength | 'all'>('all')
   const listRef = useRef<HTMLOListElement>(null)
 
-  const items = useMemo(() => filterGallery(gallery, { cat, shape, length }), [cat, shape, length])
-  const cats = useMemo(() => categoriesWithCount(gallery), [])
-  const shapes = useMemo(() => distinct(gallery, 'shape'), [])
-  const lengths = useMemo(() => distinct(gallery, 'length'), [])
+  const items = useMemo(() => filterGallery(content.gallery, { cat, shape, length }), [cat, shape, length])
+  const cats = useMemo(() => categoriesWithCount(content.gallery), [])
+  const shapes = useMemo(() => distinct(content.gallery, 'shape'), [])
+  const lengths = useMemo(() => distinct(content.gallery, 'length'), [])
 
   const openId = params.get('photo')
   const open = openId ? galleryById(openId) : undefined
-  const viewerItems = open ? viewerList(gallery, items, open.id) : []
+  const viewerItems = open ? viewerList(content.gallery, items, open.id) : []
 
   useDepth(listRef, `${view}:${items.map((g) => g.id).join(',')}`)
 
@@ -155,7 +156,7 @@ export function Gallery() {
           <div className="wrap">
             <div className="chips gallery__chips" role="group" aria-label="Catégories">
               <button type="button" className={`chip ${cat === 'all' ? 'is-active' : ''}`} aria-pressed={cat === 'all'} onClick={() => setCat('all')}>
-                Tout <small>{gallery.length}</small>
+                Tout <small>{content.gallery.length}</small>
               </button>
               {cats.map((c) => (
                 <button key={c.id} type="button" className={`chip ${cat === c.id ? 'is-active' : ''}`} aria-pressed={cat === c.id} onClick={() => setCat(c.id)}>
@@ -243,7 +244,7 @@ export function Gallery() {
         <ClientFooter />
       </main>
 
-      {open && <PoseViewer key={viewerItems === gallery ? 'all' : cat} items={viewerItems} initialId={open.id} onIndexChange={onIndexChange} onClose={closePose} />}
+      {open && <PoseViewer key={viewerItems === content.gallery ? 'all' : cat} items={viewerItems} initialId={open.id} onIndexChange={onIndexChange} onClose={closePose} />}
     </>
   )
 }

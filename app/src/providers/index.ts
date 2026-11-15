@@ -1,20 +1,10 @@
 /**
- * Point unique de branchement des providers.
+ * Contrats des fournisseurs techniques et leurs implémentations.
  *
- * Le domaine NOVIA (src/domain) ne connaît que l'interface `Providers`. Pour passer
- * de la démonstration à une intégration réelle, on remplace l'implémentation ICI
- * (ex. createGHLProviders(...) + providers Voice / Payment), sans modifier aucun
- * composant React.
- *
- * Mode actuel : 'mock' UNIQUEMENT. Aucune intégration réelle n'est branchée.
+ * Le choix des implémentations ne se fait PAS ici : il se fait dans la composition
+ * (src/app/demo.ts ou src/app/pilot.ts), selon NOVIA_MODE. En P1, seules les
+ * implémentations Mock existent ; GHL, SMS direct, Voice, paiement et Planity sont
+ * préparés et répondent `not_connected`.
  */
-import { providers as mockProviders } from './mock'
-import type { Providers } from './types'
-
-export type ProviderMode = 'mock'
-
-export const providerMode: ProviderMode = 'mock'
-
-export const providers: Providers = mockProviders
-
 export type * from './types'
+export { SystemClock, createFixedClock } from './clock'

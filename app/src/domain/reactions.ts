@@ -7,7 +7,8 @@
  */
 import type { WorkflowRules } from '../config/schema'
 import type { Appointment, ValidationOutcome } from '../core/types'
-import type { NoviaSnapshot } from '../providers/types'
+import type { NoviaSnapshot } from '../engine/model'
+import { formatIn } from '../core/time'
 
 export type ReactionTone = 'status' | 'novia' | 'slot' | 'money' | 'calm'
 
@@ -34,11 +35,11 @@ export interface Reaction {
   steps: ReactionStep[]
 }
 
-const dayTime = (iso: string) =>
-  new Date(iso).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')
+const dayTime = (iso: string, tz: string) =>
+  formatIn(iso, tz, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')
 
-const shortSlot = (iso: string) =>
-  new Date(iso).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('.', '').replace(':', 'h')
+const shortSlot = (iso: string, tz: string) =>
+  formatIn(iso, tz, { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('.', '').replace(':', 'h')
 
 const stateLabels: Record<ValidationOutcome, string> = {
   present: 'Présente',
@@ -53,6 +54,8 @@ export function reactionFor(
   after: Appointment,
   snap: Pick<NoviaSnapshot, 'runs' | 'opportunities' | 'customers'>,
   rules: WorkflowRules,
+  /** fuseau du salon : les dates affichées s'y lisent */
+  timeZone: string,
 ): Reaction {
   const run = [...snap.runs].reverse().find((r) => r.appointmentId === before.id && (r.workflow === 'W03' || r.workflow === 'W04'))
   const smartfill = snap.opportunities.find((o) => o.kind === 'smartfill' && o.status === 'open' && o.sourceAppointmentId === before.id)
@@ -87,7 +90,7 @@ export function reactionFor(
           key: 'slot',
           tone: 'slot',
           label: 'Créneau libéré',
-          detail: `${shortSlot(smartfill.slotStart)} · ${smartfill.slotDurationMin ?? before.durationMin} min · NOVIA peut le proposer à une cliente.`,
+          detail: `${shortSlot(smartfill.slotStart, timeZone)} · ${smartfill.slotDurationMin ?? before.durationMin} min · NOVIA peut le proposer à une cliente.`,
         })
       if (run?.state === 'active')
         steps.push({
@@ -102,7 +105,7 @@ export function reactionFor(
 
     case 'rescheduled':
       steps.push(
-        { key: 'status', tone: 'status', label: 'Rendez-vous reporté', detail: `Nouveau créneau : ${dayTime(after.start)}.` },
+        { key: 'status', tone: 'status', label: 'Rendez-vous reporté', detail: `Nouveau créneau : ${dayTime(after.start, timeZone)}.` },
         {
           key: 'novia',
           tone: 'novia',

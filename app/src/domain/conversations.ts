@@ -6,9 +6,8 @@
  *   - Réponse humaine requise : question inconnue ou sujet sensible, NOVIA s'arrête
  *   - Reprise humaine         : la professionnelle a repris la main, NOVIA ne répond plus
  */
-import { approvedAnswers, sensitiveKeywords, type ApprovedAnswer } from '../config/novia.demo'
 import type { Conversation, ConversationMessage, Customer } from '../core/types'
-import type { NoviaSnapshot } from '../providers/types'
+import type { NoviaSnapshot } from '../engine/model'
 
 export type ConversationState = 'novia' | 'needs_human' | 'human'
 
@@ -25,30 +24,7 @@ export function conversationState(conv: Pick<Conversation, 'needsHuman'>, custom
   return conv.needsHuman ? 'needs_human' : 'novia'
 }
 
-/** minuscules, sans accents ni apostrophes typographiques */
-export const normalize = (text: string) =>
-  text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[’']/g, ' ')
-
-export type Triage =
-  | { kind: 'faq'; answer: ApprovedAnswer }
-  | { kind: 'sensitive'; reason: string }
-  | { kind: 'unknown'; reason: string }
-
-/**
- * Décide si NOVIA peut répondre seule. Le sensible passe TOUJOURS avant la FAQ :
- * « quel prix pour une réaction allergique ? » va à la professionnelle.
- */
-export function triage(text: string, answers: ApprovedAnswer[] = approvedAnswers): Triage {
-  const t = normalize(text)
-  if (sensitiveKeywords.some((k) => t.includes(k))) return { kind: 'sensitive', reason: 'Sujet sensible : NOVIA ne répond pas seule.' }
-  const answer = answers.find((a) => a.keywords.some((k) => t.includes(k)))
-  if (answer) return { kind: 'faq', answer }
-  return { kind: 'unknown', reason: 'Question sans réponse approuvée.' }
-}
+export { normalize, triage, type Triage } from '../core/triage'
 
 export interface InboxItem {
   conversation: Conversation
@@ -71,6 +47,3 @@ export function buildInbox(snap: Pick<NoviaSnapshot, 'conversations' | 'customer
 
 export const needsHumanCount = (snap: Pick<NoviaSnapshot, 'conversations' | 'customers'>) =>
   buildInbox(snap).filter((i) => i.state === 'needs_human').length
-
-/** Réponses que NOVIA a le droit d'utiliser seule (approuvées par la professionnelle). */
-export const approvedAnswersList = () => approvedAnswers

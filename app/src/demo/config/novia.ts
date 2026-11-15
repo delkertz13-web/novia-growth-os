@@ -3,15 +3,8 @@
  * Les réponses ci-dessous sont des exemples ; en production, chaque réponse est
  * écrite ou approuvée par la professionnelle avant que NOVIA puisse l'utiliser.
  */
-import type { NoviaSettings } from '../core/types'
-
-export interface ApprovedAnswer {
-  id: string
-  topic: string
-  /** mots-clés (sans accents, en minuscules) qui déclenchent la réponse */
-  keywords: string[]
-  answer: string
-}
+import type { ApprovedAnswer } from '../../config/profile'
+import type { NoviaSettings } from '../../core/types'
 
 export const approvedAnswers: ApprovedAnswer[] = [
   {

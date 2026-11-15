@@ -5,10 +5,10 @@
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { novia } from '../domain'
-import { Icon } from './Icon'
+import { novia } from '../../domain'
+import { Icon } from '../../ui/Icon'
 import { presentation, presentationSteps } from './presentation'
-import { Sheet } from './common'
+import { Sheet } from '../../ui/common'
 
 /* ---------------- Époque de remise à zéro ---------------- */
 

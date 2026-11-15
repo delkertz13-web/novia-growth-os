@@ -1,5 +1,6 @@
 import { useCallback, useState, type CSSProperties } from 'react'
-import { galleryById, galleryCategories, lengthLabels, shapeLabels } from '../config/content.demo'
+import { galleryCategories, lengthLabels, shapeLabels } from '../config/vertical'
+import { galleryById } from '../domain'
 import type { GalleryItem } from '../config/schema'
 import { defaultWidth, mediaUrl, objectPosition, resolveMedia, srcSet } from '../media/media'
 import type { MediaAsset } from '../media/types'

@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { gallery, reviews } from '../config/content.demo'
-import { services } from '../config/services.demo'
+import { business, content, services } from '../domain'
 import { Icon } from '../ui/Icon'
 import { Photo } from '../ui/common'
 import { ClientFooter } from './ClientLayout'
@@ -30,7 +28,7 @@ export function Home() {
               </Link>
             </div>
             <div className="rail">
-              {gallery.slice(0, 8).map((g) => (
+              {content.gallery.slice(0, 8).map((g) => (
                 <button key={g.id} className="rail__item" onClick={() => navigate(`/galerie?photo=${g.id}`)}>
                   <Photo item={g} sizes="62vw" />
                   <div className="rail__cap">{g.title}</div>
@@ -66,7 +64,7 @@ export function Home() {
               <span className="badge badge--sim">Avis fictifs</span>
             </div>
             <div className="reviews">
-              {reviews.map((r) => (
+              {content.reviews.map((r) => (
                 <article key={r.author} className="card review">
                   <div className="review__stars" aria-label={`${r.rating} sur 5`}>
                     {Array.from({ length: r.rating }).map((_, i) => (

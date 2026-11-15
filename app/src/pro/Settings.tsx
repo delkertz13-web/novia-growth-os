@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { novia, type NoviaSettings } from '../domain'
+import { business, novia, type NoviaSettings } from '../domain'
 import { Icon } from '../ui/Icon'
 import { fmt, useDemoState } from '../ui/common'
 import { VoiceControls } from './Voice'
@@ -31,8 +30,8 @@ export function Settings() {
   const st = useDemoState()
   const s = st.settings
   const [error, setError] = useState('')
-  const update = (patch: Parameters<typeof novia.pro.updateSettings>[0]) => {
-    const r = novia.pro.updateSettings(patch)
+  const update = async (patch: Parameters<typeof novia.pro.updateSettings>[0]) => {
+    const r = await novia.pro.updateSettings(patch)
     setError(r.ok ? '' : r.error)
   }
   const takenOver = st.customers.filter((c) => c.humanTakeover)

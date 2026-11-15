@@ -1,5 +1,17 @@
 /** Types métier génériques (service / appointment / customer), indépendants de la verticale. */
 
+/**
+ * Chaque entité métier appartient à UNE entreprise (multi-client). Le moteur refuse tout
+ * événement ou commande dont le `businessId` n'est pas celui de son contexte.
+ */
+export type BusinessId = string
+
+/** Référence d'un objet chez un fournisseur technique (GHL, opérateur SMS, Voice, paiement, agenda). */
+export interface ExternalRef {
+  provider: string
+  id: string
+}
+
 export type AppointmentStatus =
   | 'booked' // Réservé
   | 'confirmed' // RDV confirmé (≠ CA confirmé)
@@ -39,13 +51,16 @@ export interface StatusEvent {
 }
 
 export interface PaymentProof {
-  kind: 'demo_payment'
+  /** demo_payment : preuve fictive de la démo ; declared : déclarée par la pro ; online : fournisseur de paiement */
+  kind: 'demo_payment' | 'declared' | 'online'
   amount: number
   at: string
+  externalRef?: ExternalRef
 }
 
 export interface Appointment {
   id: string
+  businessId: BusinessId
   /** identifiant court, utilisé pour la validation SMS multi-RDV */
   ref: string
   customerId: string
@@ -63,10 +78,14 @@ export interface Appointment {
   paymentProof?: PaymentProof
   /** moment de la prise de RDV (absent sur les données antérieures) */
   bookedAt?: string
+  /** incrémentée à chaque changement ; un événement externe plus ancien est ignoré (absente = 0) */
+  version?: number
+  externalRefs?: ExternalRef[]
 }
 
 export interface Customer {
   id: string
+  businessId: BusinessId
   firstName: string
   lastName: string
   phone: string
@@ -74,12 +93,47 @@ export interface Customer {
   source: LeadSource
   createdAt: string
   lifecycle: 'prospect' | 'client'
+  /**
+   * Projections du registre `consents`, maintenues UNIQUEMENT par core/consent.ts.
+   * Les règles (gardes, SmartFill, STOP) lisent ces deux champs.
+   */
   consent: { transactional: boolean; marketing: boolean }
   optOut: boolean
+  /** registre de consentement, en ajout seul (canal, finalité, état, source, date, preuve) */
+  consents: ConsentRecord[]
   humanTakeover: boolean
   lastActivityAt: string
   referrerId?: string
   noShowRecovered?: boolean
+  externalRefs?: ExternalRef[]
+}
+
+/* ------------------------------------------------------------------ */
+/* Consentement                                                         */
+/* ------------------------------------------------------------------ */
+
+export type ConsentChannel = 'sms' | 'email' | 'phone' | 'instagram' | 'all'
+/** transactional : messages liés à un RDV ; marketing : relances, réactivation, SmartFill, parrainage */
+export type ConsentPurpose = 'transactional' | 'marketing'
+/** opposed = STOP : seule une réinscription explicite (`explicit_resubscribe`) la lève */
+export type ConsentState = 'granted' | 'withdrawn' | 'opposed'
+export type ConsentSource =
+  | 'booking_form' // case cochée par la cliente lors de la réservation
+  | 'inbound_stop' // la cliente a répondu STOP
+  | 'pro_declared' // déclaré par la professionnelle (avec preuve)
+  | 'explicit_resubscribe' // réinscription explicite, distincte de toute réservation ou conversation
+  | 'import' // reprise d'un fichier existant
+  | 'demo' // donnée fictive de démonstration
+
+export interface ConsentRecord {
+  id: string
+  at: string
+  channel: ConsentChannel
+  purpose: ConsentPurpose
+  state: ConsentState
+  source: ConsentSource
+  /** preuve : texte de la case cochée, id du message STOP, référence du fichier importé… */
+  proofRef?: string
 }
 
 export type WorkflowId = 'W01' | 'W02' | 'W03' | 'W04' | 'W05' | 'W12'
@@ -99,6 +153,7 @@ export type RunStep =
 
 export interface WorkflowRun {
   id: string
+  businessId: BusinessId
   workflow: WorkflowId
   customerId: string
   appointmentId?: string
@@ -116,6 +171,7 @@ export type OpportunityKind = 'smartfill' | 'cancellation_recovery' | 'noshow_re
 
 export interface Opportunity {
   id: string
+  businessId: BusinessId
   kind: OpportunityKind
   amount: number
   status: 'open' | 'won' | 'lost'
@@ -130,6 +186,7 @@ export interface Opportunity {
 
 export interface WaitlistEntry {
   id: string
+  businessId: BusinessId
   customerId: string
   serviceId: string
   days: number[]
@@ -151,6 +208,8 @@ export interface ConversationMessage {
   body: string
   /** réponse NOVIA tirée d'une FAQ approuvée */
   faqId?: string
+  /** remise au fournisseur (messages de NOVIA ou de la pro) : voir engine/model.ts */
+  delivery?: 'pending' | 'simulated' | 'shadow' | 'sent' | 'delivered' | 'retrying' | 'failed' | 'blocked'
 }
 
 /**
@@ -159,6 +218,7 @@ export interface ConversationMessage {
  */
 export interface Conversation {
   id: string
+  businessId: BusinessId
   customerId: string
   channel: ConversationChannel
   needsHuman: boolean
@@ -166,6 +226,7 @@ export interface Conversation {
   needsHumanReason?: string
   unread: boolean
   messages: ConversationMessage[]
+  externalRefs?: ExternalRef[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -176,6 +237,7 @@ export type VoiceCallOutcome = 'booked' | 'answered' | 'transferred' | 'voicemai
 
 export interface VoiceCall {
   id: string
+  businessId: BusinessId
   at: string
   callerName: string
   phone: string
@@ -208,4 +270,11 @@ export interface NoviaSettings {
   /** plage d'envoi des messages automatiques */
   sendWindow: { start: string; end: string }
   channels: { sms: boolean; email: boolean; instagram: boolean }
+}
+
+/** Quand NOVIA Voice décroche (réglage de l'entreprise, sans aucun appel réel en P1). */
+export type VoiceMode = 'all' | 'missed' | 'after_hours'
+export interface VoiceSettings {
+  active: boolean
+  mode: VoiceMode
 }

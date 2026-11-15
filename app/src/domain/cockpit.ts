@@ -9,13 +9,11 @@ import { appointmentLevel, type RevenueReport } from '../core/revenue'
 import { isSlotFree } from '../core/availability'
 import { refillsDue } from '../core/smartfill'
 import type { Appointment, AttributionSource, Customer, Opportunity, WorkflowAction, WorkflowId, WorkflowRun } from '../core/types'
-import type { NoviaSnapshot } from '../providers/types'
+import type { NoviaSnapshot } from '../engine/model'
 import { buildInbox, type InboxItem } from './conversations'
 import { mayInitiateOutbound } from '../core/optout'
+import { monthOf, sameDay } from '../core/time'
 import { buildCustomerRows, type Segment } from './customers'
-
-export const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
 export const customerName = (c?: Pick<Customer, 'firstName' | 'lastName'>) => (c ? `${c.firstName} ${c.lastName}` : '—')
 
@@ -39,9 +37,10 @@ export function todayState(a: Appointment, now: Date): Exclude<TodayState, 'next
   return attendanceState(a, now) === 'in_progress' ? 'in_progress' : 'upcoming'
 }
 
-export function buildToday(snap: Pick<NoviaSnapshot, 'appointments' | 'customers'>, now: Date): TodayItem[] {
+/** Journée du SALON (fuseau de l'entreprise), jamais celle de l'appareil. */
+export function buildToday(snap: Pick<NoviaSnapshot, 'appointments' | 'customers'>, now: Date, timeZone: string): TodayItem[] {
   const items = snap.appointments
-    .filter((a) => sameDay(new Date(a.start), now) && a.status !== 'rescheduled')
+    .filter((a) => sameDay(new Date(a.start), now, timeZone) && a.status !== 'rescheduled')
     .sort((a, b) => a.start.localeCompare(b.start))
     .map((a): TodayItem => ({ appointment: a, customer: snap.customers.find((c) => c.id === a.customerId), state: todayState(a, now) }))
   const next = items.find((i) => i.state === 'upcoming')
@@ -138,9 +137,9 @@ export interface CockpitView {
   feed: FeedItem[]
 }
 
-export function buildCockpit(snap: NoviaSnapshot, now: Date, revenue: { all: RevenueReport; month: RevenueReport }): CockpitView {
-  const today = buildToday(snap, now)
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+export function buildCockpit(snap: NoviaSnapshot, now: Date, revenue: { all: RevenueReport; month: RevenueReport }, timeZone: string): CockpitView {
+  const today = buildToday(snap, now, timeZone)
+  const monthStart = monthOf(now, timeZone).from.getTime()
   return {
     today,
     toConfirm: snap.appointments.filter((a) => isAwaitingValidation(a, now)).sort((a, b) => b.start.localeCompare(a.start)),

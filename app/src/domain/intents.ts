@@ -1,124 +1,120 @@
 /**
- * Domaine NOVIA Pro : les intentions métier du cockpit.
+ * Application NOVIA : ce que l'interface peut demander et lire.
  *
- * Chaque bouton du cockpit appelle UNE intention nommée ici. Les intentions ne
- * connaissent que l'interface `Providers` : elles fonctionnent à l'identique avec
- * les providers Mock d'aujourd'hui et avec les providers GHL / Voice / Payment de
- * demain. Aucune logique propre à un backend ne vit ici ni dans les composants.
+ *   UI  →  ici (commandes async, lectures sync)  →  moteur (src/engine)  →  core  →  providers
+ *
+ * - Chaque bouton du cockpit appelle UNE intention nommée ici. Une intention qui ÉCRIT
+ *   passe par le moteur : elle est asynchrone et renvoie toujours un résultat explicite
+ *   (`IntentResult`), jamais une exception (même si un fournisseur tombe en panne).
+ * - Une LECTURE est synchrone : elle construit une vue à partir de l'état NOVIA courant.
+ * - Rien ici ne connaît un fournisseur (GHL, SMS, Voice, paiement) ni la démonstration :
+ *   les contrôles de démo sont injectés par la composition (src/app/demo.ts).
  */
-import { business } from '../config/business.demo'
-import type { ServiceConfig, WorkflowRules } from '../config/schema'
-import type { Appointment, NoviaSettings, ValidationOutcome, VoiceCall } from '../core/types'
-import type { BookingInput, Providers, SmartFillOutcome, VoiceSettings } from '../providers/types'
+import { serviceOf, timeZoneOf, type BusinessProfile } from '../config/profile'
+import type { ConsentChange } from '../core/consent'
+import { availableSlots as slotsOf } from '../core/availability'
+import { computeRevenue } from '../core/revenue'
+import { monthOf } from '../core/time'
+import type { Appointment, ConversationMessage, NoviaSettings, PaymentProof, ValidationOutcome, VoiceCall } from '../core/types'
+import type { BookingOrigin, LeadSource } from '../core/types'
+import { funnelFor, type ContactInput, type Engine, type EngineResult, type ExecutionMode, type NoviaState, type VoiceSettings } from '../engine'
+import type { Draft } from '../engine/engine'
 import { buildCockpit, buildCustomerFile } from './cockpit'
-import { buildInbox, triage, type Triage } from './conversations'
+import { buildInbox, type Triage } from './conversations'
 import { buildCustomerRows } from './customers'
 import { reactionFor, type Reaction } from './reactions'
 import { buildTimeline } from './timeline'
-import { scriptedCallers, voiceStats } from './voice'
+import { voiceStats } from './voice'
 
 export type IntentResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
-const attempt = <T>(fn: () => T): IntentResult<T> => {
-  try {
-    return { ok: true, value: fn() }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'Action impossible' }
-  }
+export interface BookingInput {
+  serviceId: string
+  start: Date
+  contact: ContactInput
+  source: LeadSource
+  origin: BookingOrigin
+  marketingConsent?: { granted: boolean; proofRef: string }
 }
 
-export interface NoviaOptions {
-  rules: WorkflowRules
-  services: ServiceConfig[]
+export interface SmartFillFunnel {
+  eligible: import('../core/types').Customer[]
+  contactable: import('../core/types').Customer[]
 }
 
-const monthOf = (now: Date) => ({ from: new Date(now.getFullYear(), now.getMonth(), 1), to: new Date(now.getFullYear(), now.getMonth() + 1, 1) })
+export interface SmartFillOutcome {
+  appointment: Appointment
+  customer: import('../core/types').Customer
+  funnel: SmartFillFunnel
+}
 
-export function createNovia(p: Providers, opts: NoviaOptions) {
-  const snapshot = () => p.sync.getSnapshot()
-  const conversationOf = (customerId: string) => snapshot().conversations.find((c) => c.customerId === customerId)
-  /** règles de la démo, avec la plage d'envoi choisie par la professionnelle */
-  const rulesNow = (): WorkflowRules => ({ ...opts.rules, sendWindow: p.settings.get().sendWindow })
+/** Plan d'un appel simulé (démo) : ce que NOVIA Voice dirait, avant que rien ne soit réservé. */
+export interface CallPlan {
+  caller: { firstName: string; lastName: string; phone: string; email: string; serviceId: string }
+  service: { id: string; name: string; price: number }
+  start: Date
+  when: string
+  transcript: VoiceCall['transcript']
+  trigger: VoiceCall['trigger']
+  at: Date
+}
 
-  /** Une cliente écrit (simulation) : NOVIA répond si une réponse approuvée existe, sinon passe la main. */
-  const simulateClientMessage = (conversationId: string, body: string): IntentResult<Triage | { kind: 'human' }> =>
-    attempt(() => {
-      const conv = snapshot().conversations.find((c) => c.id === conversationId)
-      if (!conv) throw new Error('Conversation introuvable')
-      p.messaging.appendMessage(conversationId, { from: 'client', body })
-      const customer = snapshot().customers.find((c) => c.id === conv.customerId)
-      // reprise humaine : NOVIA ne répond pas, la professionnelle est notifiée
-      if (customer?.humanTakeover) return { kind: 'human' as const }
-      const t = triage(body)
-      if (t.kind === 'faq') {
-        p.messaging.appendMessage(conversationId, { from: 'novia', body: t.answer.answer, faqId: t.answer.id })
-        p.messaging.updateConversation(conversationId, { unread: false })
-      } else {
-        p.messaging.updateConversation(conversationId, { needsHuman: true, needsHumanReason: t.reason, unread: true })
-      }
-      return t
-    })
+/** Contrôles de simulation : n'existent qu'en démonstration (null sinon, les boutons disparaissent). */
+export interface DemoControls {
+  reset(): void
+  advanceRecovery(runId: string): Promise<void>
+  clientDeclines(runId: string): Promise<void>
+  clientRebooks(runId: string): Promise<Appointment | undefined>
+  simulateClientMessage(conversationId: string, body: string): Promise<IntentResult<Triage | { kind: 'human' } | { kind: 'stop' }>>
+  previewIncomingCall(): IntentResult<CallPlan>
+  simulateIncomingCall(): Promise<IntentResult<{ call: VoiceCall; appointment: Appointment }>>
+  /** SmartFill lancé : la première cliente contactable accepte (W12 à concevoir) */
+  acceptSmartFill(opportunityId: string, funnel: SmartFillFunnel): Promise<SmartFillOutcome | null>
+}
 
-  /**
-   * Ce que NOVIA Voice dirait au prochain appel simulé : appelante, prestation, créneau
-   * réellement libre et transcription. Rien n'est réservé tant que l'appel n'aboutit pas.
-   */
-  const planIncomingCall = () => {
-    const voice = p.voice.getSettings()
-    if (!voice.active) throw new Error('NOVIA Voice est désactivé dans vos réglages.')
-    const known = new Set(p.voice.listCalls().map((c) => c.phone))
-    const caller = scriptedCallers.find((c) => !known.has(c.phone))
-    if (!caller) throw new Error('Tous les appels de démonstration ont été simulés. Réinitialisez la démo pour recommencer.')
-    const service = opts.services.find((s) => s.id === caller.serviceId)!
-    const now = p.clock.now()
-    let start: Date | undefined
-    for (let i = 1; i <= 14 && !start; i++) {
-      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
-      start = p.booking.getSlots(day, service.id)[0]
-    }
-    if (!start) throw new Error('Aucun créneau disponible dans les 14 prochains jours.')
-    const when = start.toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).replace(':', 'h')
-    const transcript: VoiceCall['transcript'] = [
-      { from: 'novia', text: `${business.name.value}, bonjour ! ${business.artistFirstName.value} est en prestation, je suis son assistante. Comment puis-je vous aider ?` },
-      { from: 'caller', text: `Bonjour, je voudrais prendre rendez-vous pour un ${service.name.toLowerCase()}.` },
-      { from: 'novia', text: `Avec plaisir. Le ${service.name.toLowerCase()} est à ${service.price} €. Je peux vous proposer ${when}. Cela vous convient ?` },
-      { from: 'caller', text: 'Oui, parfait.' },
-      { from: 'novia', text: 'C’est noté. Vous recevrez une confirmation par SMS. Puis-je avoir votre nom ?' },
-      { from: 'caller', text: `${caller.firstName} ${caller.lastName}.` },
-    ]
-    return { caller, service, start, when, transcript, trigger: voice.mode, at: now }
+const toIntent = <T>(r: EngineResult<T>): IntentResult<T> => (r.ok ? { ok: true, value: r.value } : { ok: false, error: r.error })
+
+export function createNovia(engine: Engine, opts: { demo?: (novia: NoviaCore) => DemoControls } = {}) {
+  const { profile } = engine
+  const tz = timeZoneOf(profile)
+  const snapshot = () => engine.store.read()
+  const run = async <T>(draft: Draft): Promise<IntentResult<T>> => toIntent(await engine.execute<T>(draft))
+  const services = () => profile.services.items.filter((s) => s.active)
+  const rulesNow = () => ({ ...profile.rules, sendWindow: snapshot().settings.sendWindow })
+  const revenue = (period?: { from: Date; to: Date }) => computeRevenue(snapshot().appointments, snapshot().opportunities, period)
+  const slots = (day: Date, serviceId: string) => {
+    const s = serviceOf(profile, serviceId)
+    return s ? slotsOf(day, s.durationMin, profile.identity.openingHours.value, snapshot().appointments, engine.now(), tz, profile.booking.value.slotStepMin) : []
   }
-
-  /** L'appel simulé aboutit : NOVIA Voice crée (ou retrouve) la cliente et le RDV dans NOVIA. */
-  const simulateIncomingCall = (): IntentResult<{ call: VoiceCall; appointment: Appointment }> =>
-    attempt(() => {
-      const plan = planIncomingCall()
-      const { serviceId: _s, ...contact } = plan.caller
-      const appointment = p.booking.createBooking({ serviceId: plan.service.id, start: plan.start, contact, source: 'voice', origin: 'voice' })
-      const call = p.voice.logCall({
-        at: plan.at.toISOString(),
-        callerName: `${plan.caller.firstName} ${plan.caller.lastName}`,
-        phone: plan.caller.phone,
-        customerId: appointment.customerId,
-        durationSec: 118,
-        trigger: plan.trigger,
-        handledBy: 'novia',
-        outcome: 'booked',
-        summary: `${plan.service.name} → RDV ${plan.when}`,
-        appointmentId: appointment.id,
-        transcript: plan.transcript,
-      })
-      return { call, appointment }
-    })
 
   /** Statut réel d'un rendez-vous, toujours déclaré par la professionnelle depuis le cockpit. */
-  const recordOutcome = (appointmentId: string, outcome: ValidationOutcome, newStart?: Date): IntentResult<Reaction> =>
-    attempt(() => {
-      const before = snapshot().appointments.find((a) => a.id === appointmentId)
-      if (!before) throw new Error('Rendez-vous introuvable')
-      const after = p.booking.validate(appointmentId, outcome, { source: 'cockpit', newStart })
-      return reactionFor(outcome, before, after, snapshot(), opts.rules)
-    })
+  const recordOutcome = async (appointmentId: string, outcome: ValidationOutcome, newStart?: Date): Promise<IntentResult<Reaction>> => {
+    const before = snapshot().appointments.find((a) => a.id === appointmentId)
+    if (!before) return { ok: false, error: 'Rendez-vous introuvable' }
+    const draft: Draft =
+      outcome === 'present' || outcome === 'absent'
+        ? { type: 'AttendanceRecorded', appointmentId, attended: outcome === 'present', statusSource: 'cockpit' }
+        : outcome === 'cancelled'
+          ? { type: 'BookingCancelled', appointmentId, statusSource: 'cockpit' }
+          : { type: 'BookingRescheduled', appointmentId, newStart: newStart?.toISOString() ?? '', statusSource: 'cockpit' }
+    if (outcome === 'rescheduled' && !newStart) return { ok: false, error: 'Un report nécessite un nouveau créneau.' }
+    const r = await run<Appointment>(draft)
+    return r.ok ? { ok: true, value: reactionFor(outcome, before, r.value, snapshot(), profile.rules, tz) } : r
+  }
+
+  const setTakeover = (customerId: string, value: boolean) => run<void>({ type: 'HumanTakeoverChanged', customerId, value })
+
+  const core: NoviaCore = {
+    /** « Maintenant » pour NOVIA : heure de référence en démo, heure système en production. */
+    now: () => engine.now(),
+    /** fuseau du salon : toute date affichée ou comparée s'y lit */
+    timeZone: tz,
+    profile,
+    execution: engine.execution,
+    snapshot,
+    subscribe: (l: () => void) => engine.store.subscribe(l),
+    run,
+  }
 
   const pro = {
     /* ---------- Rendez-vous ---------- */
@@ -128,102 +124,96 @@ export function createNovia(p: Providers, opts: NoviaOptions) {
     rescheduleAppointment: (appointmentId: string, newStart: Date) => recordOutcome(appointmentId, 'rescheduled', newStart),
     /** Variante générique pour les quatre boutons de statut. */
     recordOutcome,
-    recordPaymentProof: (appointmentId: string) => attempt(() => p.payment.recordDemoPayment(appointmentId)),
+    /** Paiement : preuve fictive en démo, déclarée par la pro sinon (le CA confirmé en dépend). */
+    recordPaymentProof: (appointmentId: string) =>
+      run<PaymentProof>({ type: 'PaymentRecorded', appointmentId, method: engine.execution === 'simulated' ? 'demo' : 'declared' }),
 
     /* ---------- Conversations ---------- */
-    /**
-     * La professionnelle reprend la main : NOVIA ne répond plus à cette cliente et ses
-     * séquences automatiques (récupérations) se mettent en pause.
-     */
-    takeOverConversation: (customerId: string) => attempt(() => p.crm.setHumanTakeover(customerId, true)),
+    /** Reprendre la main : NOVIA ne répond plus à cette cliente, ses séquences se mettent en pause. */
+    takeOverConversation: (customerId: string) => setTakeover(customerId, true),
     /** Rendre à NOVIA : elle peut de nouveau répondre ; les séquences reprennent après revérification. */
-    letNoviaHandle: (customerId: string) =>
-      attempt(() => {
-        p.crm.setHumanTakeover(customerId, false)
-        const conv = conversationOf(customerId)
-        if (conv) p.messaging.updateConversation(conv.id, { needsHuman: false, needsHumanReason: undefined })
-      }),
+    letNoviaHandle: (customerId: string) => setTakeover(customerId, false),
     inbox: () => buildInbox(snapshot()),
     conversation: (conversationId: string) => buildInbox(snapshot()).find((i) => i.conversation.id === conversationId),
     /** Conversation d'une cliente (ouverte au besoin, pour lui écrire depuis sa fiche). */
-    conversationFor: (customerId: string) => attempt(() => conversationOf(customerId) ?? p.messaging.openConversation(customerId, 'sms')),
-    markRead: (conversationId: string) => attempt(() => p.messaging.updateConversation(conversationId, { unread: false })),
-    /** Répondre soi-même : c'est une reprise humaine (NOVIA se met en retrait). Message SIMULÉ. */
-    replyAsPro: (conversationId: string, body: string) =>
-      attempt(() => {
-        const conv = snapshot().conversations.find((c) => c.id === conversationId)
-        if (!conv) throw new Error('Conversation introuvable')
-        if (!body.trim()) throw new Error('Message vide')
-        const customer = snapshot().customers.find((c) => c.id === conv.customerId)
-        if (customer && !customer.humanTakeover) p.crm.setHumanTakeover(conv.customerId, true)
-        p.messaging.updateConversation(conversationId, { needsHuman: false, needsHumanReason: undefined, unread: false })
-        return p.messaging.appendMessage(conversationId, { from: 'pro', body: body.trim() })
-      }),
+    conversationFor: (customerId: string) => run<import('../core/types').Conversation>({ type: 'OpenConversation', customerId, channel: 'sms' }),
+    markRead: (conversationId: string) => run<void>({ type: 'MarkConversationRead', conversationId }),
+    /** Répondre soi-même : c'est une reprise humaine (NOVIA se met en retrait). */
+    replyAsPro: (conversationId: string, body: string) => run<ConversationMessage>({ type: 'ReplyAsPro', conversationId, body }),
+    approvedAnswers: () => profile.approvedAnswers.value,
 
     /* ---------- Clientes ---------- */
-    customers: (now: Date) => buildCustomerRows(snapshot(), now, opts.services),
-    timeline: (customerId: string, now: Date) => buildTimeline(snapshot(), customerId, now, rulesNow(), opts.services),
+    customers: (now: Date) => buildCustomerRows(snapshot(), now, profile.services.items),
+    timeline: (customerId: string, now: Date) => buildTimeline(snapshot(), customerId, now, rulesNow(), profile.services.items, tz),
+    /** Consentement : seule une réinscription explicite et prouvée lève une opposition (STOP). */
+    recordConsent: (customerId: string, change: ConsentChange) => run<import('../core/types').Customer>({ type: 'ConsentChanged', customerId, change }),
 
     /* ---------- Réglages (appartiennent à NOVIA) ---------- */
-    settings: () => p.settings.get(),
-    updateSettings: (patch: { [K in keyof NoviaSettings]?: Partial<NoviaSettings[K]> }) =>
-      attempt(() => {
-        const cur = p.settings.get()
-        const next = {
-          automations: { ...cur.automations, ...patch.automations },
-          sendWindow: { ...cur.sendWindow, ...patch.sendWindow },
-          channels: { ...cur.channels, ...patch.channels },
-        }
-        if (next.sendWindow.start >= next.sendWindow.end) throw new Error('La fin de la plage d’envoi doit être après le début.')
-        // avis et parrainage : workflows à concevoir, non activables
-        if (next.automations.reviews || next.automations.referral) throw new Error('Cette automatisation n’est pas encore disponible.')
-        return p.settings.update(next)
-      }),
+    settings: () => snapshot().settings,
+    updateSettings: (patch: { [K in keyof NoviaSettings]?: Partial<NoviaSettings[K]> }) => run<NoviaSettings>({ type: 'SettingsChanged', settings: patch }),
 
     /* ---------- SmartFill ---------- */
-    previewSmartFill: (opportunityId: string) => p.automation.previewSmartFill(opportunityId),
-    launchSmartFill: (opportunityId: string): IntentResult<SmartFillOutcome | null> =>
-      attempt(() => {
-        if (!p.settings.get().automations.smartFill) throw new Error('SmartFill est désactivé dans vos réglages.')
-        return p.automation.launchSmartFill(opportunityId)
-      }),
-    keepSlotFree: (opportunityId: string) => attempt(() => p.automation.closeSmartFill(opportunityId)),
+    previewSmartFill: (opportunityId: string): SmartFillFunnel | null => funnelFor(snapshot(), opportunityId, profile.services.items, engine.now()),
+    launchSmartFill: async (opportunityId: string): Promise<IntentResult<SmartFillOutcome | null>> => {
+      const r = await run<SmartFillFunnel | null>({ type: 'LaunchSmartFill', opportunityId })
+      if (!r.ok || !r.value || !demo) return r.ok ? { ok: true, value: null } : r
+      return { ok: true, value: await demo.acceptSmartFill(opportunityId, r.value) }
+    },
+    keepSlotFree: (opportunityId: string) => run<void>({ type: 'OpportunityClosed', opportunityId, reason: 'kept_free' }),
 
     /* ---------- NOVIA Voice ---------- */
-    voiceSettings: () => p.voice.getSettings(),
-    configureVoice: (settings: Partial<VoiceSettings>) => attempt(() => p.voice.setSettings(settings)),
-    calls: () => [...p.voice.listCalls()].sort((a, b) => b.at.localeCompare(a.at)),
-    call: (callId: string) => p.voice.listCalls().find((c) => c.id === callId),
-    voiceStats: () => voiceStats(p.voice.listCalls()),
+    voiceSettings: (): VoiceSettings => snapshot().voice,
+    configureVoice: (settings: Partial<VoiceSettings>) => run<NoviaSettings>({ type: 'SettingsChanged', voice: settings }),
+    calls: () => [...snapshot().calls].sort((a, b) => b.at.localeCompare(a.at)),
+    call: (callId: string) => snapshot().calls.find((c) => c.id === callId),
+    voiceStats: () => voiceStats(snapshot().calls),
 
     /* ---------- Consultation ---------- */
-    cockpit: (now: Date) =>
-      buildCockpit(snapshot(), now, { all: p.analytics.getRevenue(), month: p.analytics.getRevenue(monthOf(now)) }),
-    customerFile: (customerId: string, now: Date) => buildCustomerFile(snapshot(), customerId, now, opts.services),
+    cockpit: (now: Date) => buildCockpit(snapshot(), now, { all: revenue(), month: revenue(monthOf(now, tz)) }, tz),
+    customerFile: (customerId: string, now: Date) => buildCustomerFile(snapshot(), customerId, now, profile.services.items),
     appointment: (appointmentId: string): Appointment | undefined => snapshot().appointments.find((a) => a.id === appointmentId),
-    revenueAttribution: (period?: { from: Date; to: Date }) => p.analytics.getRevenue(period),
-    revenueThisMonth: (now: Date) => p.analytics.getRevenue(monthOf(now)),
-    availableSlots: (day: Date, serviceId: string) => p.booking.getSlots(day, serviceId),
+    /** Revenu : toujours CALCULÉ par NOVIA (une attribution par RDV), jamais lu chez un fournisseur. */
+    revenueAttribution: (period?: { from: Date; to: Date }) => revenue(period),
+    revenueThisMonth: (now: Date) => revenue(monthOf(now, tz)),
+    availableSlots: slots,
   }
 
   /** Parcours cliente (site de réservation). */
   const client = {
-    services: () => p.booking.listServices(),
-    availableSlots: (day: Date, serviceId: string) => p.booking.getSlots(day, serviceId),
-    book: (input: BookingInput) => p.booking.createBooking(input),
+    services,
+    availableSlots: slots,
+    book: (input: BookingInput) =>
+      run<Appointment>({
+        type: 'BookingCreated',
+        source: 'novia-client',
+        serviceId: input.serviceId,
+        start: input.start.toISOString(),
+        contact: input.contact,
+        leadSource: input.source,
+        origin: input.origin,
+        marketingConsent: input.marketingConsent,
+      }),
   }
 
+  const demo = opts.demo?.(core)
   return {
-    /** « Maintenant » pour NOVIA : heure de référence en démo, heure système en production. */
-    now: () => p.clock.now(),
-    clockMode: p.clock.mode,
-    snapshot,
-    subscribe: (l: () => void) => p.sync.subscribe(l),
+    ...core,
+    clockMode: engine.clockMode,
     pro,
     client,
-    /** Contrôles de simulation : `null` avec un backend réel (les boutons disparaissent). */
-    demo: p.demo ? { ...p.demo, simulateClientMessage, previewIncomingCall: () => attempt(planIncomingCall), simulateIncomingCall } : null,
+    /** Contrôles de simulation : `null` hors démonstration (les boutons disparaissent). */
+    demo: demo ?? null,
   }
 }
 
+/** Ce que les contrôles de démo reçoivent de l'application. */
+export interface NoviaCore {
+  now(): Date
+  timeZone: string
+  profile: BusinessProfile
+  execution: ExecutionMode
+  snapshot(): NoviaState
+  subscribe(l: () => void): () => void
+  run<T>(draft: Draft): Promise<IntentResult<T>>
+}
 export type Novia = ReturnType<typeof createNovia>

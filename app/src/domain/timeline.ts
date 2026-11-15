@@ -6,7 +6,8 @@
 import type { ServiceConfig, WorkflowRules } from '../config/schema'
 import { isActiveBooking } from '../core/appointmentStatus'
 import type { Appointment, BookingOrigin, VoiceCall, WorkflowRun } from '../core/types'
-import type { NoviaSnapshot } from '../providers/types'
+import type { NoviaSnapshot } from '../engine/model'
+import { formatIn } from '../core/time'
 
 export type TimelineKind = 'booked' | 'reminder' | 'attendance' | 'service' | 'payment' | 'satisfaction' | 'followup' | 'cancelled' | 'call'
 
@@ -30,12 +31,12 @@ export const originLabels: Record<BookingOrigin, string> = {
   recovery: 'Récupération NOVIA',
 }
 
-const day = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '')
-const hm = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+const day = (iso: string, tz: string) => formatIn(iso, tz, { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '')
+const hm = (iso: string, tz: string) => formatIn(iso, tz, { hour: '2-digit', minute: '2-digit' })
 
-function appointmentEvents(a: Appointment, rules: WorkflowRules, services: ServiceConfig[], isLastShowed: boolean): TimelineEvent[] {
+function appointmentEvents(a: Appointment, rules: WorkflowRules, services: ServiceConfig[], isLastShowed: boolean, tz: string): TimelineEvent[] {
   const name = services.find((s) => s.id === a.serviceId)?.name ?? 'Prestation'
-  const when = `${day(a.start)} à ${hm(a.start)}`
+  const when = `${day(a.start, tz)} à ${hm(a.start, tz)}`
   const out: TimelineEvent[] = []
   const id = (k: string) => `${a.id}:${k}`
   if (a.bookedAt) {
@@ -98,11 +99,11 @@ export interface Timeline {
   history: TimelineEvent[]
 }
 
-export function buildTimeline(snap: NoviaSnapshot, customerId: string, now: Date, rules: WorkflowRules, services: ServiceConfig[]): Timeline {
+export function buildTimeline(snap: NoviaSnapshot, customerId: string, now: Date, rules: WorkflowRules, services: ServiceConfig[], timeZone: string): Timeline {
   const mine = snap.appointments.filter((a) => a.customerId === customerId)
   const lastShowed = mine.filter((a) => a.status === 'showed').sort((a, b) => b.start.localeCompare(a.start))[0]
   const all = [
-    ...mine.flatMap((a) => appointmentEvents(a, rules, services, a === lastShowed)),
+    ...mine.flatMap((a) => appointmentEvents(a, rules, services, a === lastShowed, timeZone)),
     ...snap.runs.filter((r) => r.customerId === customerId).flatMap(runEvents),
     ...snap.calls.filter((c) => c.customerId === customerId).map(callEvent),
   ]

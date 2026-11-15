@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { galleryById } from '../config/content.demo'
-import { serviceById } from '../config/services.demo'
+import { business, galleryById, novia, serviceById } from '../domain'
 import type { Appointment } from '../core/types'
 import { resolveMedia } from '../media/media'
-import { novia } from '../domain'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Photo, useDemoState } from '../ui/common'
+import { capitalize, fmt, Photo, salon, useDemoState } from '../ui/common'
 import { prefersReducedMotion } from '../ui/motion'
 import './booking/booking.css'
 import { dayState, dayStateLabel, sameDay, steps, type Step } from './booking/model'
@@ -21,7 +18,10 @@ const stepTitles: Record<Step, string> = {
   recap: 'Récapitulatif',
 }
 
-const period = (d: Date) => (d.getHours() < 12 ? 'Matin' : d.getHours() < 17 ? 'Après-midi' : 'Soir')
+const period = (d: Date) => {
+  const h = salon.wall(d).hour
+  return h < 12 ? 'Matin' : h < 17 ? 'Après-midi' : 'Soir'
+}
 const hours = business.openingHours.value
 
 /** Temps du « bouton qui réagit » avant que la réservation se pose (aucun appel réseau). */
@@ -58,18 +58,17 @@ export function Booking() {
 
   const days = useMemo(() => {
     const out: { date: Date; count: number }[] = []
-    const base = novia.now()
-    base.setHours(0, 0, 0, 0)
+    // jours du SALON, à minuit (fuseau de l'entreprise)
+    const base = salon.startOfDay(novia.now())
     for (let i = 0; i < 21; i++) {
-      const d = new Date(base)
-      d.setDate(base.getDate() + i)
+      const d = salon.addDays(base, i)
       out.push({ date: d, count: serviceId ? novia.client.availableSlots(d, serviceId).length : 0 })
     }
     return out
     // `step` : recalcul en revenant sur l'étape (l'agenda a pu changer)
   }, [serviceId, step])
 
-  const selectedDay = day ?? (slot ? new Date(new Date(slot).setHours(0, 0, 0, 0)) : null) ?? days.find((d) => d.count > 0)?.date ?? null
+  const selectedDay = day ?? (slot ? salon.startOfDay(slot) : null) ?? days.find((d) => d.count > 0)?.date ?? null
   const slots = selectedDay && serviceId ? novia.client.availableSlots(selectedDay, serviceId) : []
   const grouped = slots.reduce<Record<string, Date[]>>((acc, s) => {
     ;(acc[period(s)] ??= []).push(s)
@@ -100,10 +99,16 @@ export function Booking() {
 
   const confirm = () => {
     if (!service || !slot || sending || done) return
-    const create = () => {
-      const a = novia.client.book({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
+    const create = async () => {
+      const r = await novia.client.book({ serviceId: service.id, start: slot, contact, source: 'site', origin: 'site' })
+      if (!r.ok) {
+        // créneau pris entre-temps : la cliente en choisit un autre
+        setSending(false)
+        setSlot(null)
+        return
+      }
       setBookedAt(novia.now())
-      setDone(a)
+      setDone(r.value)
     }
     // Le bouton réagit, le décor se calme et le ticket se recentre, puis la réservation se pose.
     window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
@@ -221,7 +226,7 @@ export function Booking() {
                 selected={selectedDay}
                 onPick={(d) => {
                   setDay(d)
-                  if (slot && !sameDay(slot, d)) setSlot(null)
+                  if (slot && !sameDay(slot, d, novia.timeZone)) setSlot(null)
                 }}
               />
               <div className="bk-slots" key={selectedDay?.toDateString()}>
@@ -415,8 +420,8 @@ function DayStrip({ days, selected, onPick }: { days: { date: Date; count: numbe
   return (
     <div className="bk-days" ref={ref} role="listbox" aria-label="Jour">
       {days.map(({ date, count }) => {
-        const state = dayState(date, hours, count)
-        const on = !!selected && sameDay(date, selected)
+        const state = dayState(date, hours, count, novia.timeZone)
+        const on = !!selected && sameDay(date, selected, novia.timeZone)
         return (
           <button
             key={date.toISOString()}
@@ -428,8 +433,8 @@ function DayStrip({ days, selected, onPick }: { days: { date: Date; count: numbe
             aria-selected={on}
             aria-label={`${capitalize(fmt.dayLong(date))} : ${dayStateLabel(state)}`}
           >
-            <small>{date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}</small>
-            <b>{date.getDate()}</b>
+            <small>{fmt.date(date, { weekday: 'short' }).replace('.', '')}</small>
+            <b>{salon.wall(date).day}</b>
             <i>{dayStateLabel(state)}</i>
           </button>
         )

@@ -6,9 +6,12 @@
   "description": "NOVIA Nails — Demo V1. Démonstration autonome, données fictives, aucun service externe.",
   "scripts": {
     "dev": "vite --host",
+    "dev:pilot": "VITE_NOVIA_MODE=pilot vite --host",
     "build": "tsc --noEmit && vite build",
+    "build:pilot": "tsc --noEmit && VITE_NOVIA_MODE=pilot vite build",
     "preview": "vite preview --host",
     "test": "TZ=Europe/Paris vitest run",
+    "test:tz": "TZ=America/New_York vitest run && TZ=Asia/Tokyo vitest run && TZ=Pacific/Kiritimati vitest run",
     "typecheck": "tsc --noEmit",
     "media": "node scripts/media.mjs"
   },

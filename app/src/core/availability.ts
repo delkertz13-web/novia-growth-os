@@ -1,29 +1,27 @@
 import type { OpeningHours } from '../config/schema'
 import { appointmentEnd } from './appointmentStatus'
+import { atTime, weekday } from './time'
 import type { Appointment, Customer } from './types'
 
 const occupies = (a: Appointment) => a.status !== 'cancelled' && a.status !== 'rescheduled'
 
-const at = (day: Date, hhmm: string) => {
-  const [h, m] = hhmm.split(':').map(Number)
-  const d = new Date(day)
-  d.setHours(h, m, 0, 0)
-  return d
-}
-
-/** Créneaux libres d'une journée pour une durée donnée (pas de 30 min par défaut). */
+/**
+ * Créneaux libres d'une journée pour une durée donnée (pas de 30 min par défaut).
+ * `day` désigne un jour du salon : les horaires sont lus dans son fuseau (`timeZone`).
+ */
 export function availableSlots(
   day: Date,
   durationMin: number,
   hours: OpeningHours,
   appointments: Appointment[],
   now: Date,
+  timeZone: string,
   stepMin = 30,
 ): Date[] {
-  const h = hours[day.getDay()]
+  const h = hours[weekday(day, timeZone)]
   if (!h) return []
-  const open = at(day, h.open)
-  const close = at(day, h.close)
+  const open = atTime(day, h.open, timeZone)
+  const close = atTime(day, h.close, timeZone)
   const busy = appointments.filter(occupies).map((a) => [new Date(a.start).getTime(), appointmentEnd(a).getTime()])
   const slots: Date[] = []
   for (let t = open.getTime(); t + durationMin * 60_000 <= close.getTime(); t += stepMin * 60_000) {

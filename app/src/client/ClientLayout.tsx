@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { business } from '../config/business.demo'
+import { business } from '../domain'
 import './client.css'
 
 export function ClientHeader({ overlay = false, scene = false }: { overlay?: boolean; scene?: boolean }) {

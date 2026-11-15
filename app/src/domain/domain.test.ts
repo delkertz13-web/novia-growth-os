@@ -1,20 +1,24 @@
-import { describe, expect, it, vi } from 'vitest'
-import { rules } from '../config/rules.demo'
-import { services } from '../config/services.demo'
+import { describe, expect, it } from 'vitest'
+import { parseWall } from '../core/time'
+import { createDemoNovia } from '../app/demo'
 import type { Appointment } from '../core/types'
-import { GHLAutomationProvider, GHLBookingProvider, GHLCRMProvider, createGHLProviders } from '../providers/ghl'
-import { LivePaymentProvider, LiveVoiceProvider } from '../providers/future'
-import { providers as mockProviders } from '../providers/mock'
-import { createSeed } from '../providers/mock/seed'
-import { NotConnectedError } from '../providers/notConnected'
-import type { NoviaSnapshot, Providers } from '../providers/types'
+import { demoProfile } from '../demo/config/profile'
+import { rules } from '../demo/config/rules'
+import { createSeed } from '../demo/seed'
+import { createEngine, createMemoryStore, type NoviaSnapshot } from '../engine'
+import { createFixedClock } from '../providers/clock'
+import { DirectSmsProvider, LivePaymentProvider, LiveVoiceProvider, PlanityCalendarProvider } from '../providers/future'
+import { createGHLProviders, GHLCrmMirrorProvider, GHLMessagingProvider, GHLVoiceProvider } from '../providers/ghl'
+import { createMockProviders } from '../providers/mock'
+import type { MessagingProvider } from '../providers/types'
 import { buildCockpit, buildToday } from './cockpit'
 import { createNovia } from './intents'
 import { reactionFor } from './reactions'
 
-const NOW = new Date('2026-11-05T15:10:00')
+const NOW = parseWall('2026-11-05T15:10:00', 'Europe/Paris')
 const seed = createSeed(NOW)
 const snap: NoviaSnapshot = seed
+const TZ = demoProfile.identity.timezone.value
 const emptyReport = () => {
   const z = () => ({ potential: 0, booked: 0, confirmed: 0 })
   return {
@@ -25,8 +29,8 @@ const emptyReport = () => {
 }
 
 describe('cockpit (lectures)', () => {
-  it('classe la journée : à confirmer, prochain, à venir, terminé', () => {
-    const today = buildToday(snap, NOW)
+  it('classe la journée : à confirmer, prochain, à venir, terminé', async () => {
+    const today = buildToday(snap, NOW, TZ)
     const states = today.map((i) => i.state)
     expect(states.filter((s) => s === 'to_confirm')).toHaveLength(2)
     expect(states.filter((s) => s === 'next')).toHaveLength(1)
@@ -34,8 +38,8 @@ describe('cockpit (lectures)', () => {
     expect(states).toContain('done')
   })
 
-  it('remonte les présences à confirmer et le créneau libéré', () => {
-    const v = buildCockpit(snap, NOW, { all: emptyReport(), month: emptyReport() })
+  it('remonte les présences à confirmer et le créneau libéré', async () => {
+    const v = buildCockpit(snap, NOW, { all: emptyReport(), month: emptyReport() }, TZ)
     expect(v.toConfirm).toHaveLength(2)
     expect(v.freedSlots).toHaveLength(1)
     expect(v.takenOver.map((c) => c.id)).toEqual(['c20'])
@@ -46,84 +50,93 @@ describe('cockpit (lectures)', () => {
 describe('réactions NOVIA', () => {
   const a: Appointment = seed.appointments.find((x) => x.customerId === 'c01' && x.serviceId === 'remplissage')!
 
-  it('absence : statut, NOVIA Recovery démarre, 45 € à récupérer', () => {
+  it('absence : statut, NOVIA Recovery démarre, 45 € à récupérer', async () => {
     const after = { ...a, status: 'no_show' as const }
-    const run = { id: 'r1', workflow: 'W04' as const, customerId: a.customerId, appointmentId: a.id, state: 'active' as const, step: 'wait' as const, messagesSent: 0, startedAt: NOW.toISOString(), actions: [] }
-    const r = reactionFor('absent', a, after, { ...snap, runs: [run] }, rules)
+    const run = { id: 'r1', businessId: seed.businessId, workflow: 'W04' as const, customerId: a.customerId, appointmentId: a.id, state: 'active' as const, step: 'wait' as const, messagesSent: 0, startedAt: NOW.toISOString(), actions: [] }
+    const r = reactionFor('absent', a, after, { ...snap, runs: [run] }, rules, TZ)
     expect(r.steps.map((s) => s.key)).toEqual(['status', 'novia', 'money'])
     expect(r.steps[1].tone).toBe('novia')
     expect(r.steps[2].amount).toBe(45)
     expect(r.runId).toBe('r1')
   })
 
-  it('absence sans séquence active : NOVIA reste en retrait', () => {
-    const r = reactionFor('absent', a, { ...a, status: 'no_show' }, { ...snap, runs: [] }, rules)
+  it('absence sans séquence active : NOVIA reste en retrait', async () => {
+    const r = reactionFor('absent', a, { ...a, status: 'no_show' }, { ...snap, runs: [] }, rules, TZ)
     expect(r.steps[1].tone).toBe('calm')
     expect(r.runId).toBeUndefined()
   })
 
-  it('annulation à venir : le créneau libéré apparaît pour SmartFill', () => {
+  it('annulation à venir : le créneau libéré apparaît pour SmartFill', async () => {
     const future = seed.appointments.find((x) => x.status === 'cancelled')!
     const opp = seed.opportunities.find((o) => o.kind === 'smartfill' && o.sourceAppointmentId === future.id)!
-    const r = reactionFor('cancelled', { ...future, status: 'confirmed' }, future, snap, rules)
+    const r = reactionFor('cancelled', { ...future, status: 'confirmed' }, future, snap, rules, TZ)
     expect(r.steps.map((s) => s.key)).toContain('slot')
     expect(r.smartfillId).toBe(opp.id)
   })
 })
 
 describe('intentions métier (indépendantes du backend)', () => {
-  const fake = (overrides: Partial<Providers> = {}) => {
-    const validate = vi.fn((id: string, outcome: string) => ({ ...seed.appointments.find((x) => x.id === id)!, status: outcome === 'present' ? 'showed' : 'no_show' }) as Appointment)
-    const p = {
-      ...mockProviders,
-      demo: undefined,
-      sync: { getSnapshot: () => snap, subscribe: () => () => {} },
-      booking: { ...mockProviders.booking, validate },
-      ...overrides,
-    } satisfies Providers
-    return { p, validate }
+  /** une entreprise sur un store neuf, avec les providers donnés (Mock par défaut) */
+  const setup = (opts: { messaging?: MessagingProvider; execution?: 'simulated' | 'shadow' | 'live' } = {}) => {
+    const store = createMemoryStore(createSeed(NOW))
+    const clock = createFixedClock(NOW)
+    const providers = { ...createMockProviders(clock), ...(opts.messaging ? { messaging: opts.messaging } : {}) }
+    const engine = createEngine({ store, profile: demoProfile, providers, execution: opts.execution ?? 'simulated' })
+    return { store, novia: createNovia(engine) }
   }
 
-  it('déclarer une absence passe par booking.validate avec la source cockpit', () => {
-    const { p, validate } = fake()
-    const novia = createNovia(p, { rules, services })
+  it('déclarer une absence passe par le moteur avec la source cockpit', async () => {
+    const { novia } = setup()
     const a = seed.appointments.find((x) => x.customerId === 'c01' && x.serviceId === 'remplissage')!
-    const res = novia.pro.declareAbsence(a.id)
-    expect(validate).toHaveBeenCalledWith(a.id, 'absent', { source: 'cockpit', newStart: undefined })
+    const res = await novia.pro.declareAbsence(a.id)
     expect(res.ok && res.value.stateLabel).toBe('Absente')
+    expect(novia.snapshot().appointments.find((x) => x.id === a.id)!.history.at(-1)).toMatchObject({ to: 'no_show', source: 'cockpit' })
   })
 
   it('sans contrôles de démo, novia.demo est null', () => {
-    const novia = createNovia(fake().p, { rules, services })
-    expect(novia.demo).toBeNull()
+    expect(setup().novia.demo).toBeNull()
   })
 
-  it('une erreur du provider devient un résultat lisible, sans exception', () => {
-    const novia = createNovia(fake({ booking: GHLBookingProvider }).p, { rules, services })
-    const res = novia.pro.confirmPresence(seed.appointments[0].id)
-    expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toMatch(/non connectée/)
+  it('une erreur du provider devient un résultat lisible, sans exception', async () => {
+    // messagerie préparée mais non branchée : la décision est enregistrée, l'envoi est marqué en échec
+    const { novia, store } = setup({ messaging: GHLMessagingProvider })
+    const start = novia.client.availableSlots(new Date(NOW.getTime() + 2 * 86_400_000), 'remplissage')[0]
+    const res = await novia.client.book({ serviceId: 'remplissage', start, contact: { firstName: 'Test', lastName: 'Panne', phone: '06 98 76 54 32', email: 'panne@exemple.demo' }, source: 'site', origin: 'site' })
+    expect(res.ok).toBe(true)
+    const entry = store.read().outbox[0]
+    expect(entry).toMatchObject({ status: 'failed', lastError: { code: 'not_connected', retryable: false } })
+    expect(store.read().messages[0].status).toBe('failed')
+    // un refus métier reste un résultat lisible
+    const refused = await novia.pro.confirmPresence('inconnu')
+    expect(refused).toEqual({ ok: false, error: 'Rendez-vous introuvable' })
   })
 })
 
 describe('providers préparés, non connectés', () => {
-  it('chaque méthode GHL / Voice / Payment lève NotConnectedError', () => {
-    expect(() => GHLCRMProvider.listCustomers()).toThrow(NotConnectedError)
-    expect(() => GHLAutomationProvider.launchSmartFill('o1')).toThrow(NotConnectedError)
-    expect(() => LiveVoiceProvider.getSettings()).toThrow(NotConnectedError)
-    expect(() => LivePaymentProvider.recordDemoPayment('a1')).toThrow(NotConnectedError)
-    const ghl = createGHLProviders({ locationId: '', calendarId: '', pipelineId: '', customFields: { attendance: '', attributionSource: '', noShowRecovered: '', humanTakeover: '' } })
-    expect(Object.keys(ghl).sort()).toEqual(['analytics', 'automation', 'booking', 'crm', 'messaging', 'sync'])
+  it('chaque méthode GHL / SMS direct / Voice / Payment / Planity répond not_connected, sans exception', async () => {
+    const write = { businessId: 'b1', idempotencyKey: 'k1' }
+    const results = await Promise.all([
+      GHLMessagingProvider.send({ ...write, to: { customerId: 'c1', phone: '', name: '' }, channel: 'sms', body: '', purpose: 'transactional' }),
+      DirectSmsProvider.send({ ...write, to: { customerId: 'c1', phone: '', name: '' }, channel: 'sms', body: '', purpose: 'transactional' }),
+      GHLCrmMirrorProvider.setOptOut({ ...write, customerId: 'c1', optOut: true }),
+      GHLVoiceProvider.configure({ ...write, settings: { active: true, mode: 'missed' }, greeting: '' }),
+      LiveVoiceProvider.configure({ ...write, settings: { active: true, mode: 'missed' }, greeting: '' }),
+      LivePaymentProvider.createPaymentLink({ ...write, appointment: { id: 'a1', deposit: 10, price: 45 } }),
+      PlanityCalendarProvider.listBusy({ businessId: 'b1', from: '', to: '' }),
+    ])
+    for (const r of results) expect(r).toMatchObject({ ok: false, error: { code: 'not_connected', retryable: false } })
+    const ghl = createGHLProviders({ locationId: '', customFields: { noviaCustomerId: '', noviaMarketingConsent: '', noviaSource: '' }, tag: 'novia' })
+    expect(Object.keys(ghl).sort()).toEqual(['crm', 'messaging', 'voice'])
   })
 })
 
 describe('parcours complet avec les providers Mock', () => {
-  it('Absente → récupération W04 démarrée → 45 € à récupérer en plus', () => {
-    const novia = createNovia(mockProviders, { rules, services })
+  it('Absente → récupération W04 démarrée → 45 € à récupérer en plus', async () => {
+    const novia = createDemoNovia()
     const now = novia.now()
     const before = novia.pro.cockpit(now)
     const target = before.toConfirm.find((a) => a.price === 45)!
-    const res = novia.pro.declareAbsence(target.id)
+    const res = await novia.pro.declareAbsence(target.id)
     expect(res.ok).toBe(true)
     const after = novia.pro.cockpit(now)
     expect(after.toConfirm.find((a) => a.id === target.id)).toBeUndefined()
@@ -131,14 +144,14 @@ describe('parcours complet avec les providers Mock', () => {
     expect(after.revenue.toRecover - before.revenue.toRecover).toBe(45)
   })
 
-  it('reprendre la conversation met la séquence en pause ; rendre à NOVIA la relance', () => {
-    const novia = createNovia(mockProviders, { rules, services })
+  it('reprendre la conversation met la séquence en pause ; rendre à NOVIA la relance', async () => {
+    const novia = createDemoNovia()
     const run = novia.snapshot().runs.find((r) => r.state === 'active')!
-    novia.pro.takeOverConversation(run.customerId)
+    await novia.pro.takeOverConversation(run.customerId)
     // Lot 6 : la reprise humaine suspend (pause) au lieu d'arrêter, sans aucun envoi
     expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('paused')
     expect(novia.pro.customerFile(run.customerId, novia.now())!.contactable).toBe(false)
-    novia.pro.letNoviaHandle(run.customerId)
+    await novia.pro.letNoviaHandle(run.customerId)
     expect(novia.snapshot().customers.find((c) => c.id === run.customerId)!.humanTakeover).toBe(false)
     expect(novia.snapshot().runs.find((r) => r.id === run.id)!.state).toBe('active')
   })

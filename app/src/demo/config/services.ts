@@ -1,4 +1,4 @@
-import type { ServiceConfig } from './schema'
+import type { ServiceConfig } from '../../config/schema'
 
 /** Catalogue FICTIF. Durées, prix, acomptes et délais sont des exemples de démonstration. */
 export const servicesStatus = 'demo' as const

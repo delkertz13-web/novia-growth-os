@@ -1,4 +1,4 @@
-import { demo, unknown, type BusinessConfig } from './schema'
+import { demo, unknown, type BusinessConfig } from '../../config/schema'
 
 /**
  * Identité de DÉMONSTRATION. Aucune de ces valeurs n'est celle du salon réel.

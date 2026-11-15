@@ -1,19 +1,29 @@
 /**
- * Instance NOVIA de l'application. Les composants React importent `novia` depuis ici,
- * jamais un provider directement.
+ * Instance NOVIA de l'application. Les composants React importent `novia` (et le
+ * profil de l'entreprise) depuis ici, jamais un provider, jamais la démonstration.
+ *
+ * `@novia/runtime` est résolu au build selon NOVIA_MODE (vite.config.ts) :
+ * src/app/demo.ts ou src/app/pilot.ts. C'est le seul aiguillage demo / pilot.
  */
-import { rules } from '../config/rules.demo'
-import { services } from '../config/services.demo'
-import { providers } from '../providers'
-import { createNovia } from './intents'
+import { novia } from '@novia/runtime'
+import { serviceOf } from '../config/profile'
 
-export const novia = createNovia(providers, { rules, services })
+export { novia }
+export { mode as noviaMode } from '@novia/runtime'
+
+/** Profil de l'entreprise courante (identité, prestations, contenu du site). */
+export const profile = novia.profile
+export const business = profile.identity
+export const services = profile.services.items
+export const serviceById = (id: string) => serviceOf(profile, id)
+export const content = profile.content
+export const galleryById = (id: string) => profile.content.gallery.find((g) => g.id === id)
 
 export * from './cockpit'
 export * from './reactions'
 export * from './kpi'
-export type { IntentResult, Novia } from './intents'
-export type { NoviaSnapshot, SmartFillFunnel, VoiceMode, VoiceSettings } from '../providers/types'
+export type { BookingInput, CallPlan, DemoControls, IntentResult, Novia, SmartFillFunnel, SmartFillOutcome } from './intents'
+export type { NoviaSnapshot, VoiceMode, VoiceSettings } from '../engine/model'
 export * from './conversations'
 export * from './customers'
 export * from './timeline'

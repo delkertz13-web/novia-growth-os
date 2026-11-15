@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom'
-import { business } from '../config/business.demo'
-import { novia } from '../domain'
+import { business, novia } from '../domain'
 import type { ServiceConfig } from '../config/schema'
 import { Icon } from '../ui/Icon'
-import { capitalize, fmt, Photo } from '../ui/common'
+import { fmt, Photo, salon } from '../ui/common'
 
 export function ServiceRow({ service: s }: { service: ServiceConfig }) {
   return (
@@ -25,9 +24,10 @@ export function ServiceRow({ service: s }: { service: ServiceConfig }) {
 }
 
 const weekdays = [1, 2, 3, 4, 5, 6, 0]
+const weekdayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 
 export function HoursCard() {
-  const today = novia.now().getDay()
+  const today = salon.wall(novia.now()).weekday
   const hours = business.openingHours.value
   return (
     <div className="card" style={{ padding: 22 }}>
@@ -39,7 +39,7 @@ export function HoursCard() {
         <tbody>
           {weekdays.map((d) => {
             const h = hours[d]
-            const name = capitalize(new Date(2026, 10, 1 + ((d + 7) % 7)).toLocaleDateString('fr-FR', { weekday: 'long' }))
+            const name = weekdayNames[d]
             return (
               <tr key={d} className={d === today ? 'is-today' : ''}>
                 <td>{name}</td>

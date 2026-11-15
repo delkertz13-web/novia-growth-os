@@ -2,7 +2,8 @@
  * Galerie — logique pure (filtres, vues, lien de réservation), testée à part.
  * Aucune dépendance au DOM ni à React.
  */
-import { galleryCategories, serviceForCategory } from '../../config/content.demo'
+import { galleryCategories } from '../../config/vertical'
+import { content, services } from '../../domain'
 import type { GalleryCategory, GalleryItem, NailLength, NailShape } from '../../config/schema'
 
 export type GalleryView = 'portfolio' | 'grille'
@@ -49,7 +50,7 @@ export function viewerList(all: readonly GalleryItem[], filtered: readonly Galle
   return filtered.some((g) => g.id === openId) ? filtered : all
 }
 
-export const serviceIdForPose = (g: GalleryItem) => serviceForCategory[g.category]
+export const serviceIdForPose = (g: GalleryItem) => content.serviceForCategory[g.category] ?? services[0]?.id ?? ''
 
 /** Lien « Je veux cette pose » : prestation correspondante présélectionnée, pose gardée en inspiration. */
 export function bookingHref(g: GalleryItem) {

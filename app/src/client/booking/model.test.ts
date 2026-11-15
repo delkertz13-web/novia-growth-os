@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { business } from '../../config/business.demo'
-import { rules } from '../../config/rules.demo'
+import { business } from '../../demo/config/business'
+import { rules } from '../../demo/config/rules'
 import type { Appointment } from '../../core/types'
+import { parseWall, wall } from '../../core/time'
 import { fmt } from '../../ui/common'
 import { dayState, dayStateLabel, depositLabel, followUps, inspoSize, slotEnd } from './model'
 
 const hours = business.openingHours.value
-const at = (iso: string) => new Date(iso)
+const TZ = business.timezone.value
+/** heure murale du salon, quel que soit le fuseau du processus */
+const at = (iso: string) => parseWall(iso, TZ)
 
 const appt = (start: Date): Appointment => ({
   id: 'a1',
+  businessId: 'b1',
   ref: 'A1',
   customerId: 'c1',
   serviceId: 'pose-gel',
@@ -27,15 +31,15 @@ describe('réservation · modèle', () => {
   it('distingue jour fermé, complet et disponible selon les horaires', () => {
     const sunday = at('2026-11-08T12:00:00')
     const wednesday = at('2026-11-04T12:00:00')
-    expect(dayState(sunday, hours, 0)).toEqual({ kind: 'closed' })
-    expect(dayState(wednesday, hours, 0)).toEqual({ kind: 'full' })
-    expect(dayState(wednesday, hours, 5)).toEqual({ kind: 'open', count: 5 })
-    expect(dayStateLabel(dayState(sunday, hours, 0))).toBe('Fermé')
+    expect(dayState(sunday, hours, 0, TZ)).toEqual({ kind: 'closed' })
+    expect(dayState(wednesday, hours, 0, TZ)).toEqual({ kind: 'full' })
+    expect(dayState(wednesday, hours, 5, TZ)).toEqual({ kind: 'open', count: 5 })
+    expect(dayStateLabel(dayState(sunday, hours, 0, TZ))).toBe('Fermé')
     expect(dayStateLabel({ kind: 'open', count: 3 })).toBe('3 dispo')
   })
 
   it('calcule la fin du rendez-vous', () => {
-    expect(slotEnd(at('2026-11-04T10:30:00'), 120).getHours()).toBe(12)
+    expect(wall(slotEnd(at('2026-11-04T10:30:00'), 120), TZ).hour).toBe(12)
   })
 
   it('la pose choisie devient plus discrète au fil des étapes, sans disparaître', () => {
