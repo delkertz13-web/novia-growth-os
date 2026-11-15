@@ -41,6 +41,7 @@ export interface Unit {
 function unitStore(initial: NoviaState, persist: (prev: NoviaState, next: NoviaState) => Promise<void>) {
   let state = initial
   let dirty = false
+  let failure: unknown
   const store: NoviaStore = {
     businessId: initial.businessId,
     read: () => state,
@@ -48,7 +49,13 @@ function unitStore(initial: NoviaState, persist: (prev: NoviaState, next: NoviaS
       const { state: next, value } = work(state)
       if (next !== state) {
         if (next.businessId !== state.businessId) throw new Error('Isolation : un état ne change jamais d’entreprise.')
-        await persist(state, next)
+        try {
+          await persist(state, next)
+        } catch (e) {
+          // panne d'enregistrement : la transaction est perdue, l'unité de travail échouera
+          failure ??= e
+          throw e
+        }
         state = next
         dirty = true
       }
@@ -56,7 +63,7 @@ function unitStore(initial: NoviaState, persist: (prev: NoviaState, next: NoviaS
     },
     subscribe: () => () => undefined,
   }
-  return { store, isDirty: () => dirty, read: () => state }
+  return { store, isDirty: () => dirty, read: () => state, failure: () => failure }
 }
 
 export function createNoviaApp(deps: { db: Db; clock: ServerClock }) {
@@ -69,8 +76,15 @@ export function createNoviaApp(deps: { db: Db; clock: ServerClock }) {
       const profile = await loadProfile(sql, businessId)
       const loaded = await loadState(sql, businessId)
       const unit = unitStore(loaded, (prev, next) => saveState(sql, prev, next, actor))
-      const engine = createEngine({ store: unit.store, profile, providers, execution: 'shadow', dispatch: 'deferred' })
+      const raw = createEngine({ store: unit.store, profile, providers, execution: 'shadow', dispatch: 'deferred' })
+      // le moteur transforme une exception en refus : une panne de la BASE doit, elle, tout annuler
+      const surface = <R,>(r: R) => {
+        if (unit.failure()) throw unit.failure()
+        return r
+      }
+      const engine: Engine = { ...raw, execute: async (i) => surface(await raw.execute(i)), flush: async () => surface(await raw.flush()) }
       const value = await work({ engine, profile, state: unit.read, sql })
+      if (unit.failure()) throw unit.failure()
       if (unit.isDirty()) {
         const s = unit.read()
         const rules = { ...profile.rules, sendWindow: s.settings.sendWindow }

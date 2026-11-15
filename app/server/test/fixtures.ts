@@ -68,16 +68,17 @@ export async function setup(opts: { businesses?: { id: string; verified?: boolea
       await db.businessTx(b.id, (c) => c.query('update business_settings set settings = $2 where business_id = $1', [b.id, p.defaultSettings]))
     }
   }
-  return {
+  const t = {
     database,
     db,
     clock,
     app,
     async close() {
-      await db.close()
+      await t.db.close()
       await database.drop()
     },
   }
+  return t
 }
 
 export const contact = (n = 1) => ({ firstName: `Test${n}`, lastName: 'Cliente', phone: `06 00 00 00 ${String(n).padStart(2, '0')}`, email: `test${n}@exemple.invalid` })

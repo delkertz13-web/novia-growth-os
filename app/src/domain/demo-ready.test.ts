@@ -177,7 +177,7 @@ describe('Mode présentation', () => {
 
   it('18 étapes, chacune vers une page qui existe', async () => {
     expect(presentationSteps).toHaveLength(18)
-    const main = Object.values(import.meta.glob('../main.tsx', { query: '?raw', import: 'default', eager: true }))[0] as string
+    const main = Object.values(import.meta.glob('../router.tsx', { query: '?raw', import: 'default', eager: true }))[0] as string
     const client = [...main.matchAll(/path: '(\/[a-z]*)'/g)].map((m) => m[1])
     const pro = [...main.slice(main.indexOf("path: '/pro'")).matchAll(/path: '([a-z]+)(\/:id)?'/g)].map((m) => [`/pro/${m[1]}`, !!m[2]] as const)
     const s = snap()

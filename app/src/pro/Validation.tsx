@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import type { Appointment, ValidationOutcome } from '../core/types'
-import { customerName, novia, type Reaction } from '../domain'
+import { customerName, novia, paymentWording, type Reaction } from '../domain'
 import { Sheet, SimBadge, useDemoState } from '../ui/common'
 import { ReschedulePicker } from './parts'
 import { ReactionLinks, ReactionSteps } from './Reaction'
@@ -88,10 +88,11 @@ function ReactionSheet({ r, onClose }: { r: Reaction; onClose: () => void }) {
             if ((await novia.pro.recordPaymentProof(a.id)).ok) setPaid(true)
           }}
         >
-          Simuler une preuve de paiement (fictive)
+          {paymentWording.actionShort}
         </button>
       )}
-      {paid && <div className="run__result">Preuve fictive enregistrée : CA confirmé.</div>}
+      {r.outcome === 'present' && a && !a.paymentProof && !paid && paymentWording.note && <div className="muted" style={{ fontSize: 13 }}>{paymentWording.note}</div>}
+      {paid && <div className="run__result">{paymentWording.done}</div>}
       <button className="btn btn--ghost" onClick={onClose}>
         Fermer
       </button>

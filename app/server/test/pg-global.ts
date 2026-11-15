@@ -17,6 +17,8 @@ declare module 'vitest' {
   export interface ProvidedContext {
     pgAdminUrl: string
     pgTemplate: string
+    /** outils PostgreSQL (pg_dump, psql) pour la preuve sauvegarde / restauration */
+    pgBin: string
   }
 }
 
@@ -44,6 +46,7 @@ export default async function setup(project: TestProject) {
     if (!bin) {
       project.provide('pgAdminUrl', '')
       project.provide('pgTemplate', '')
+      project.provide('pgBin', '')
       return
     }
     const dir = mkdtempSync(join(tmpdir(), 'novia-pg-'))
@@ -74,6 +77,7 @@ export default async function setup(project: TestProject) {
   await admin.end()
   project.provide('pgAdminUrl', adminUrl)
   project.provide('pgTemplate', template)
+  project.provide('pgBin', pgBin() ?? '')
   return async () => {
     const a = new pg.Client({ connectionString: adminUrl })
     await a.connect().catch(() => undefined)

@@ -7,7 +7,8 @@
  * à cette entreprise, lue en base à chaque requête : le navigateur ne choisit jamais son
  * entreprise. Les opérations passent par l'application (moteur), jamais par du SQL ici.
  */
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { extname, join, normalize } from 'node:path'
 import type { BusinessProfile } from '../../src/config/profile'
@@ -117,6 +118,9 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
     if (!m || (role && m.role !== role)) throw new HttpError(403, 'Accès refusé.')
     return m
   }
+
+  /** journaux sans identifiant d'entreprise ni de cliente */
+  const maskPath = (p: string) => p.replace(/\/(b|customers)\/[^/]+/g, '/$1/:id')
 
   async function route(req: IncomingMessage, res: ServerResponse, url: URL) {
     const method = req.method ?? 'GET'
@@ -231,6 +235,13 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
     return serveStatic(res, path)
   }
 
+  /** CSP stricte : seuls les scripts en ligne du build (empreinte SHA-256) sont autorisés */
+  const csp = (() => {
+    const index = config.staticDir && existsSync(join(config.staticDir, 'index.html')) ? readFileSync(join(config.staticDir, 'index.html'), 'utf8') : ''
+    const hashes = [...index.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`)
+    return `default-src 'self'; script-src 'self' ${hashes.join(' ')}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'`
+  })()
+
   function serveStatic(res: ServerResponse, path: string) {
     if (!config.staticDir) throw new HttpError(404, 'Introuvable.')
     const root = config.staticDir
@@ -241,8 +252,7 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
     res.writeHead(200, {
       'content-type': MIME[ext] ?? 'application/octet-stream',
       'cache-control': file.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
-      'content-security-policy':
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+      'content-security-policy': csp,
     })
     createReadStream(file).pipe(res)
   }
@@ -261,10 +271,10 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
         e instanceof HttpError ? e.status : e instanceof InputError || e instanceof ProfileError ? 400 : e instanceof AuthError ? 401 : e instanceof BusinessNotFound ? 404 : 500
       // aucune donnée personnelle ni détail interne dans la réponse ou dans le journal technique
       const message = status === 500 ? 'Erreur interne.' : e instanceof Error ? e.message : 'Erreur.'
-      if (status === 500) log({ level: 'error', path: url.pathname.replace(/\/[A-Za-z0-9_-]{1,80}(?=\/|$)/g, '/:x'), error: e instanceof Error ? e.name : 'unknown' })
+      if (status === 500) log({ level: 'error', path: maskPath(url.pathname), error: e instanceof Error ? e.name : 'unknown' })
       if (!res.headersSent) send(res, status, { error: message })
     } finally {
-      log({ level: 'info', method: req.method, path: url.pathname.startsWith('/api/') ? url.pathname.replace(/\/[A-Za-z0-9_-]{1,80}(?=\/|$)/g, '/:x') : 'static', status: res.statusCode, ms: Date.now() - started })
+      log({ level: 'info', method: req.method, path: url.pathname.startsWith('/api/') ? maskPath(url.pathname) : 'static', status: res.statusCode, ms: Date.now() - started })
     }
   })
 }

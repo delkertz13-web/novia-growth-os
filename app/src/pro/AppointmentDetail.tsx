@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { novia, originLabels, serviceById } from '../domain'
+import { novia, originLabels, paymentWording, serviceById } from '../domain'
 import { attendanceState, isAwaitingValidation, noShowCounts, statusLabels } from '../core/appointmentStatus'
 import { appointmentLevel, formatEUR, levelLabels, sourceLabels } from '../core/revenue'
 import { buildValidationSms } from '../core/smsValidation'
@@ -120,9 +120,16 @@ export function AppointmentDetail() {
       )}
 
       {a.status === 'showed' && !a.paymentProof && (
-        <button className="btn btn--ghost" onClick={() => novia.pro.recordPaymentProof(a.id)}>
-          Simuler une preuve de paiement (fictive) → CA confirmé
-        </button>
+        <>
+          <button className="btn btn--ghost" onClick={() => novia.pro.recordPaymentProof(a.id)}>
+            {paymentWording.action}
+          </button>
+          {paymentWording.note && (
+            <div className="muted" style={{ fontSize: 13 }}>
+              {paymentWording.note}
+            </div>
+          )}
+        </>
       )}
 
       {runs.length > 0 && (

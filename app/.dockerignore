@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-pilot
+dist-server
+screenshots-tmp
+*.log
+.env*

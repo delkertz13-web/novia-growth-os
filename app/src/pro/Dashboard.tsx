@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { business, customerName, kpiDefinitions, novia, serviceById, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
+import { business, customerName, kpiDefinitions, novia, paymentWording, serviceById, type FeedItem, type Reaction, type TodayItem, type TodayState } from '../domain'
 import { appointmentEnd } from '../core/appointmentStatus'
 import { formatEUR } from '../core/revenue'
 import type { Appointment } from '../core/types'
@@ -418,7 +418,7 @@ function KpiHelp({ onClose }: { onClose: () => void }) {
           </div>
         ))}
       </dl>
-      <p className="kpi-help__demo">Données de démonstration, entièrement fictives. Aucun montant n’est encaissé par NOVIA.</p>
+      <p className="kpi-help__demo">{paymentWording.kpiFootnote}</p>
       <button className="btn btn--ghost btn--block" onClick={onClose}>
         Fermer
       </button>

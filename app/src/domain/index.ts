@@ -17,6 +17,8 @@ export const business = profile.identity
 export const services = profile.services.items
 export const serviceById = (id: string) => serviceOf(profile, id)
 export const content = profile.content
+/** Libellés du paiement : fournis par la composition (preuve fictive en démo, déclaration en pilote). */
+export { paymentWording } from '@novia/runtime'
 export const galleryById = (id: string) => profile.content.gallery.find((g) => g.id === id)
 
 export * from './cockpit'

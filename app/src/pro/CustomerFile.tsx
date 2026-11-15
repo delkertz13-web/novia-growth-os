@@ -65,7 +65,7 @@ export function CustomerFile() {
         <button type="button" className="icon-btn" aria-label="Retour" onClick={() => history.back()}>
           <Icon name="arrowLeft" size={18} />
         </button>
-        <span className="eyebrow">Fiche cliente · données fictives</span>
+        <span className="eyebrow">{novia.execution === 'simulated' ? 'Fiche cliente · données fictives' : 'Fiche cliente'}</span>
       </div>
 
       <header className="cf__head">

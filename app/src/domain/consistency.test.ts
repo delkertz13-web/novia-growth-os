@@ -266,10 +266,15 @@ describe('Démonstration : rien de réel ne part', () => {
   it('le code de l’application ne contient aucun appel réseau', async () => {
     const sources = import.meta.glob(['../**/*.{ts,tsx}', '!../**/*.test.ts'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
     expect(Object.keys(sources).length).toBeGreaterThan(30)
+    // seul le client de l'API du PILOTE (P2) appelle le réseau, et uniquement son propre serveur ;
+    // la démonstration ne l'importe jamais (vérifié ci-dessous et dans le bundle de démo)
     const offenders = Object.entries(sources)
+      .filter(([f]) => f !== '../pilot/api.ts')
       .filter(([, code]) => /\bfetch\(|XMLHttpRequest|sendBeacon|new WebSocket|EventSource/.test(code))
       .map(([f]) => f)
     expect(offenders).toEqual([])
+    const demoSide = Object.entries(sources).filter(([f]) => /\.\.\/(app\/demo|demo\/)/.test(f))
+    expect(demoSide.filter(([, code]) => /from '[^']*pilot(\/|')/.test(code)).map(([f]) => f)).toEqual([])
   })
 
   it('les messages sont seulement consignés, les paiements seulement fictifs', async () => {

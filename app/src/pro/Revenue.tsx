@@ -9,7 +9,7 @@ import { fmt, Notice, salon, useDemoState, useNow } from '../ui/common'
 const defs: Record<RevenueLevel, string> = {
   potential: 'Ce que NOVIA peut encore regagner : créneaux à remplir, clientes à récupérer. Ni réservé, ni payé.',
   booked: 'Rendez-vous réservés, ou prestations attestées sans preuve de paiement. Pas encore encaissé.',
-  confirmed: 'Prestation attestée ET preuve de paiement (fictive dans la démo).',
+  confirmed: novia.execution === 'simulated' ? 'Prestation attestée ET preuve de paiement (fictive dans la démo).' : 'Prestation attestée ET paiement déclaré par vous. NOVIA n’encaisse rien.',
 }
 
 const shown: AttributionSource[] = ['acquisition', 'cancellation_recovery', 'noshow_recovery', 'reactivation', 'referral', 'smartfill', 'voice']
