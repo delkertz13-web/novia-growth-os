@@ -19,6 +19,8 @@ import { Revenue } from './pro/Revenue'
 import { ScrollTop } from './ui/common'
 // démo : bandeau DÉMO + remise à zéro ; pilote : rien (aiguillé par NOVIA_MODE, vite.config.ts)
 import { Shell } from '@novia/shell'
+// pilote : écrans de préparation (P3) ; démo : aucun
+import { extraProRoutes } from '@novia/extra'
 
 function Root() {
   return (
@@ -65,6 +67,7 @@ const router = createBrowserRouter([
           { path: 'voice', element: <Voice /> },
           { path: 'revenue', element: <Revenue /> },
           { path: 'reglages', element: <Settings /> },
+          ...extraProRoutes,
         ],
       },
       { path: '*', element: <Home /> },

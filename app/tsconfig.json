@@ -16,7 +16,8 @@
     "types": ["vite/client", "vitest/importMeta"],
     "paths": {
       "@novia/runtime": ["./src/app/demo.ts"],
-      "@novia/shell": ["./src/app/demo-shell.tsx"]
+      "@novia/shell": ["./src/app/demo-shell.tsx"],
+      "@novia/extra": ["./src/app/demo-routes.tsx"]
     }
   },
   "include": ["src", "vite.config.ts"]

@@ -94,6 +94,7 @@ export async function loadState(c: Sql, businessId: string): Promise<NoviaState>
       noShowRecovered: r.extra.noShowRecovered,
       externalRefs: refsOf('customer', r.id),
       anonymizedAt: iso(r.anonymized_at),
+      provenance: r.provenance ?? undefined,
     }),
   )
 
@@ -120,6 +121,7 @@ export async function loadState(c: Sql, businessId: string): Promise<NoviaState>
       bookedAt: iso(r.booked_at),
       version: r.version || undefined,
       externalRefs: refsOf('appointment', r.id),
+      provenance: r.provenance ?? undefined,
     })
   })
 
@@ -292,11 +294,12 @@ export async function saveState(c: Sql, prev: NoviaState, next: NoviaState, acto
     const cols = [
       b, x.id, x.firstName, x.lastName, x.phone, x.email, x.source, x.lifecycle, x.consent.transactional, x.consent.marketing, x.optOut,
       x.humanTakeover, x.createdAt, x.lastActivityAt, x.anonymizedAt ?? null, clean({ referrerId: x.referrerId, noShowRecovered: x.noShowRecovered }),
+      x.provenance ?? null,
     ]
     await run(
       `insert into customers (business_id, id, first_name, last_name, phone, email, lead_source, lifecycle, consent_transactional, consent_marketing,
-         opt_out, human_takeover, created_at, last_activity_at, anonymized_at, extra)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         opt_out, human_takeover, created_at, last_activity_at, anonymized_at, extra, provenance)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        on conflict (business_id, id) do update set first_name = $3, last_name = $4, phone = $5, email = $6, lead_source = $7, lifecycle = $8,
          consent_transactional = $9, consent_marketing = $10, opt_out = $11, human_takeover = $12, last_activity_at = $14, anonymized_at = $15, extra = $16`,
       cols,
@@ -326,13 +329,13 @@ export async function saveState(c: Sql, prev: NoviaState, next: NoviaState, acto
     if (old && same(old, a)) continue
     await run(
       `insert into appointments (business_id, id, ref, customer_id, service_id, start_at, duration_min, price, deposit, status, booking_origin, attribution,
-         rescheduled_from_id, rescheduled_to_id, booked_at, version, history)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-       on conflict (business_id, id) do update set start_at = $6, duration_min = $7, price = $8, deposit = $9, status = $10, booking_origin = $11,
+         rescheduled_from_id, rescheduled_to_id, booked_at, version, history, provenance)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       on conflict (business_id, id) do update set service_id = $5, start_at = $6, duration_min = $7, price = $8, deposit = $9, status = $10, booking_origin = $11,
          attribution = $12, rescheduled_from_id = $13, rescheduled_to_id = $14, booked_at = $15, version = $16, history = $17`,
       [
         b, a.id, a.ref, a.customerId, a.serviceId, a.start, a.durationMin, a.price, a.deposit, a.status, a.bookingOrigin, a.attribution,
-        a.rescheduledFromId ?? null, a.rescheduledToId ?? null, a.bookedAt ?? null, a.version ?? 0, JSON.stringify(a.history),
+        a.rescheduledFromId ?? null, a.rescheduledToId ?? null, a.bookedAt ?? null, a.version ?? 0, JSON.stringify(a.history), a.provenance ?? null,
       ],
     )
     if (a.paymentProof && !same(old?.paymentProof, a.paymentProof))

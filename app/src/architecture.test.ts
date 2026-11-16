@@ -58,6 +58,14 @@ describe('pilote P2 : le serveur fait autorité, aucun transport', () => {
     expect(scope.filter((f) => /localStorage\.setItem\((?!CHOICE)/.test(sources[`./${f}`]))).toEqual([])
   })
 
+  it('P3 : les écrans de préparation du pilote ne sont branchés que par la composition pilote', () => {
+    const users = files.filter((f) => !f.startsWith('pilot/ui/') && importsOf(f).some((t) => t.startsWith('pilot/ui/')))
+    expect(users).toEqual(['app/pilot-routes.tsx'])
+    // la démo n'importe rien du pilote (ni écran, ni API)
+    expect(importsOf('app/demo-routes.tsx').filter((t) => t.startsWith('pilot'))).toEqual([])
+    expect(sources['./pilot/ui/kit.tsx']).not.toMatch(/localStorage/)
+  })
+
   it('le code du navigateur n’importe jamais le serveur, pg, la partie serveur des passkeys ni node:*', () => {
     const bad = files.flatMap((f) => importsOf(f).filter((t) => /^(\.\.\/server|server\/|pg$|@simplewebauthn\/server|node:)/.test(t)).map((t) => `${f} → ${t}`))
     expect(bad).toEqual([])

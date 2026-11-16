@@ -43,6 +43,7 @@ export default defineConfig({
     alias: {
       '@novia/runtime': src(`app/${noviaMode}.ts`),
       '@novia/shell': src(`app/${noviaMode}-shell.tsx`),
+      '@novia/extra': src(`app/${noviaMode}-routes.tsx`),
     },
   },
   test: {

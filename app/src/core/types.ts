@@ -29,6 +29,15 @@ export type StatusSource = 'integration' | 'pro' | 'cockpit' | 'sms' | 'other' |
 
 export type LeadSource = 'site' | 'instagram' | 'facebook' | 'chatbot' | 'manual' | 'phone' | 'voice' | 'referral'
 
+/**
+ * Provenance d'une donnée importante (cliente, RDV). Posée par le SERVEUR, jamais par le
+ * navigateur. Une saisie manuelle n'est jamais présentée comme venant de Planity.
+ * Certaines sources ne sont pas encore actives (Planity, Voice, GHL) : elles existent pour
+ * que la provenance reste exacte le jour où elles le seront.
+ */
+export type Provenance = 'PRO_MANUAL' | 'OWNER_MANUAL' | 'PLANITY_EXPORT' | 'PLANITY_NOTIFICATION' | 'NOVIA_BOOKING' | 'VOICE' | 'GHL' | 'IMPORT'
+export const provenances: readonly Provenance[] = ['PRO_MANUAL', 'OWNER_MANUAL', 'PLANITY_EXPORT', 'PLANITY_NOTIFICATION', 'NOVIA_BOOKING', 'VOICE', 'GHL', 'IMPORT']
+
 export type BookingOrigin = 'site' | 'pro' | 'voice' | 'smartfill' | 'recovery'
 
 /** Une seule source d'attribution par rendez-vous : pas de double compte. */
@@ -81,6 +90,8 @@ export interface Appointment {
   /** incrémentée à chaque changement ; un événement externe plus ancien est ignoré (absente = 0) */
   version?: number
   externalRefs?: ExternalRef[]
+  /** d'où vient ce RDV (saisie, import, réservation NOVIA…) */
+  provenance?: Provenance
 }
 
 export interface Customer {
@@ -108,6 +119,8 @@ export interface Customer {
   externalRefs?: ExternalRef[]
   /** données personnelles effacées (droit à l'effacement) : la fiche ne garde que l'historique utile */
   anonymizedAt?: string
+  /** d'où vient cette fiche (saisie, import, réservation NOVIA…) */
+  provenance?: Provenance
 }
 
 /* ------------------------------------------------------------------ */

@@ -50,6 +50,14 @@ export const salon = {
   daysBetween: (a: Date, b: Date) => time.daysBetween(a, b, tz),
   monthOf: (d: Date) => time.monthOf(d, tz),
   parseDayKey: (key: string) => time.parseWall(key, tz),
+  /** « 2026-12-07T14:30 » (champ date-heure) lu dans le fuseau du salon */
+  parseLocal: (value: string) => {
+    try {
+      return time.parseWall(value, tz)
+    } catch {
+      return null
+    }
+  },
 }
 
 export const sameDay = salon.sameDay

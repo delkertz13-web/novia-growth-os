@@ -32,7 +32,7 @@ export interface EngineOptions<S extends NoviaState> {
 }
 
 /** Entrée sans enveloppe : le moteur complète source, date et identifiant. */
-export type Draft = InputBody & Partial<Pick<NoviaInput, 'eventId' | 'source' | 'occurredAt' | 'externalRefs' | 'version' | 'businessId'>>
+export type Draft = InputBody & Partial<Pick<NoviaInput, 'eventId' | 'source' | 'occurredAt' | 'externalRefs' | 'version' | 'businessId' | 'provenance'>>
 
 const targetAppointment = (input: NoviaInput) =>
   'appointmentId' in input && (input.type === 'AttendanceRecorded' || input.type === 'BookingCancelled' || input.type === 'BookingRescheduled') ? input.appointmentId : undefined

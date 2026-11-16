@@ -50,6 +50,16 @@ export interface CancellationPolicy {
   text: string
 }
 
+/**
+ * Agenda : qui fait foi ? Scénario A du pilote : Planity reste l'agenda réel, NOVIA n'en
+ * garde qu'une copie OBSERVÉE (saisie, import) et n'affiche alors AUCUNE disponibilité.
+ */
+export interface SchedulePolicy {
+  authority: Field<'planity' | 'novia'>
+  /** l'agenda qui fait foi envoie-t-il déjà des rappels aux clientes ? (sinon : doublons) */
+  externalReminders: Field<boolean>
+}
+
 export interface SmartFillPolicy {
   /** nombre maximal de clientes sollicitées pour un créneau */
   maxContacts: number
@@ -84,6 +94,8 @@ export interface BusinessProfile {
   /** identité, contact, FUSEAU et horaires d'ouverture */
   identity: BusinessConfig
   services: { status: DataStatus; items: ServiceConfig[] }
+  /** agenda qui fait foi (Planity ou NOVIA) et rappels déjà envoyés par lui */
+  schedule: SchedulePolicy
   breaks: Field<Break[]>
   booking: Field<BookingPolicy>
   cancellation: Field<CancellationPolicy>

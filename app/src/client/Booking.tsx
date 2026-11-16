@@ -248,7 +248,15 @@ export function Booking() {
                     </div>
                   </div>
                 ))}
-                {slots.length === 0 && <div className="bk-empty">Aucun créneau ce jour-là.</div>}
+                {slots.length === 0 &&
+                  (days.every((d) => d.count === 0) ? (
+                    // aucune fausse disponibilité : sans agenda NOVIA vérifié (ex. Planity fait foi), rien n'est proposé
+                    <div className="bk-empty" role="status">
+                      La réservation en ligne n’est pas ouverte pour le moment. Contactez directement le salon pour prendre rendez-vous.
+                    </div>
+                  ) : (
+                    <div className="bk-empty">Aucun créneau ce jour-là.</div>
+                  ))}
               </div>
             </div>
           </>

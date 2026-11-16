@@ -1,5 +1,5 @@
 # NOVIA Pilot (P2) : API + ordonnanceur + front pilote, une seule image, aucun secret dedans.
-# Les secrets (DATABASE_URL…) sont injectés à l'exécution par l'hébergeur (Scaleway Secret Manager).
+# Les secrets (DATABASE_URL, NOVIA_CRON_TOKEN) sont injectés à l'exécution comme variables secrètes du conteneur.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

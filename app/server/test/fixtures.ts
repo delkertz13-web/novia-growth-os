@@ -1,10 +1,11 @@
 /** Banc d'essai serveur : vraie base PostgreSQL, rôle applicatif (sécurité au niveau des lignes), horloge pilotée. */
-import type { BusinessProfile } from '../../src/config/profile'
+import type { BusinessProfile, TemplateId } from '../../src/config/profile'
 import { parseWall } from '../../src/core/time'
 import { createPilotProfile } from '../../src/pilot/profile'
 import { createNoviaApp } from '../application/novia'
 import { createDb } from '../infra/db'
 import { createBusiness, saveProfile } from '../repositories/business'
+import { approveTemplate, createTemplateDraft, saveFaqDraft, setFaqStatus } from '../repositories/pilot'
 import type { Actor } from '../repositories/state'
 import { createTestDatabase } from './pg'
 
@@ -34,6 +35,7 @@ export function verifiedTestProfile(businessId: string): BusinessProfile {
       items: [{ id: 'pose', name: 'Pose test', description: '', durationMin: 60, price: 50, deposit: 0, category: 'pose', returnRecommendedAfterDays: 21, active: true, coverImageId: '' }],
     },
     booking: v({ minNoticeHours: 0, maxAdvanceDays: 60, slotStepMin: 30, bufferMin: 0 }),
+    schedule: { authority: v('planity' as const), externalReminders: v(false) },
     rules: {
       status: 'verified',
       sendWindow: { start: '09:00', end: '20:00' },
@@ -66,6 +68,17 @@ export async function setup(opts: { businesses?: { id: string; verified?: boolea
       const p = verifiedTestProfile(b.id)
       await db.businessTx(b.id, (c) => saveProfile(c, b.id, p, admin))
       await db.businessTx(b.id, (c) => c.query('update business_settings set settings = $2 where business_id = $1', [b.id, p.defaultSettings]))
+      // textes et FAQ : APPROUVÉS par l'établissement (tables dédiées), jamais repris du profil
+      await db.businessTx(b.id, async (c) => {
+        for (const [key, t] of Object.entries(p.templates) as [TemplateId, { value: string }][]) {
+          const v = await createTemplateDraft(c, b.id, key, t.value, admin, T0)
+          await approveTemplate(c, b.id, key, v, admin, T0)
+        }
+        for (const a of p.approvedAnswers.value) {
+          const id = await saveFaqDraft(c, b.id, { intent: a.topic, keywords: a.keywords, answer: a.answer }, admin, T0)
+          await setFaqStatus(c, b.id, id, 'APPROVED', admin, T0)
+        }
+      })
     }
   }
   const t = {

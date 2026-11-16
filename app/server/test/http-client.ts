@@ -9,10 +9,10 @@ import type { setup } from './fixtures'
 export const ORIGIN = 'https://pilote.novia.test'
 export const RP_ID = 'pilote.novia.test'
 
-export async function startServer(t: Awaited<ReturnType<typeof setup>>) {
+export async function startServer(t: Awaited<ReturnType<typeof setup>>, opts: { cronToken?: string; tick?: () => Promise<unknown> } = {}) {
   const app = createNoviaApp({ db: t.db, clock: t.clock })
   const auth = createAuth(t.db, { rpId: RP_ID, rpName: 'NOVIA Pro', origin: ORIGIN }, t.clock)
-  const server = createHttpServer({ app, auth, db: t.db, config: { origin: ORIGIN, secureCookies: false, authPerMinute: 1000 } })
+  const server = createHttpServer({ app, auth, db: t.db, clock: t.clock, tick: opts.tick, config: { origin: ORIGIN, secureCookies: false, authPerMinute: 1000, cronToken: opts.cronToken } })
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   return { app, auth, base, close: () => new Promise<void>((r) => server.close(() => r())) }

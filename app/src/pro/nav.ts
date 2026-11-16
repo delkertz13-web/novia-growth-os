@@ -10,5 +10,5 @@ export const proTabs: { to: string; label: string; icon: IconName; end?: boolean
   { to: '/pro/agenda', label: 'Agenda', icon: 'calendar', also: ['/pro/rdv'] },
   { to: '/pro/clientes', label: 'Clientes', icon: 'user', also: ['/pro/cliente'] },
   { to: '/pro/messages', label: 'Messages', icon: 'message' },
-  { to: '/pro/novia', label: 'NOVIA', icon: 'sparkle', also: ['/pro/voice', '/pro/revenue', '/pro/reglages'] },
+  { to: '/pro/novia', label: 'NOVIA', icon: 'sparkle', also: ['/pro/voice', '/pro/revenue', '/pro/reglages', '/pro/pilote'] },
 ]

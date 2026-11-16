@@ -7,6 +7,7 @@ import type { Appointment, Customer, Opportunity } from '../core/types'
 import { Icon } from '../ui/Icon'
 import { capitalize, fmt, salon, Sheet, SimBadge, useDemoState, useNow } from '../ui/common'
 import { customerName, RunCard, StatTile } from './parts'
+import { ExtraHubTiles } from '@novia/extra'
 
 /** jour du salon, pour ouvrir l'agenda sur ce jour */
 const dayKey = (iso: string) => salon.dayKey(new Date(iso))
@@ -59,6 +60,7 @@ export function Novia() {
           <strong>Réglages</strong>
           <span>Automatisations, horaires</span>
         </Link>
+        <ExtraHubTiles />
       </nav>
 
       <p className="muted" style={{ margin: '18px 0 0', fontSize: 14 }}>

@@ -65,7 +65,7 @@ function useAction() {
       await work()
     } catch (e) {
       // annulation de la passkey par l'utilisatrice : message simple
-      setError(e instanceof Error && e.name === 'NotAllowedError' ? 'Opération annulée.' : e instanceof Error ? e.message : 'Erreur inattendue.')
+      setError(e instanceof Error && e.name === 'NotAllowedError' ? 'Connexion annulée. Vous pouvez réessayer.' : e instanceof Error ? e.message : 'Erreur inattendue.')
     } finally {
       setBusy(false)
     }
@@ -77,7 +77,7 @@ function Login() {
   const { busy, error, run } = useAction()
   return (
     <Page title="Connexion">
-      <p className="muted">Connectez-vous avec la passkey de cet appareil (Face ID, Touch ID ou code). Aucun mot de passe.</p>
+      <p className="muted">Utilisez le déverrouillage de cet appareil : Face ID, empreinte ou code. Aucun mot de passe à retenir.</p>
       <button
         className="btn btn--primary btn--block"
         disabled={busy}
@@ -90,7 +90,7 @@ function Login() {
           })
         }
       >
-        Se connecter avec une passkey
+        Se connecter avec Face ID, empreinte ou code
       </button>
       {error && <p className="field__error">{error}</p>}
       <p className="muted" style={{ fontSize: 13 }}>
@@ -105,7 +105,7 @@ function Invitation({ token }: { token: string }) {
   const { busy, error, run } = useAction()
   return (
     <Page title="Invitation">
-      <p className="muted">Créez la passkey de cet appareil. Elle remplace tout mot de passe ; sur iPhone, elle est synchronisée par le trousseau iCloud.</p>
+      <p className="muted">Activez la connexion par Face ID, empreinte ou code de cet appareil. Aucun mot de passe : sur iPhone, l’accès suit votre trousseau iCloud.</p>
       <div className="field">
         <label htmlFor="pilot-name">Votre prénom</label>
         <input id="pilot-name" value={name} maxLength={60} autoComplete="given-name" onChange={(e) => setName(e.target.value)} />
@@ -127,7 +127,7 @@ function Invitation({ token }: { token: string }) {
           })
         }
       >
-        Créer ma passkey
+        Activer Face ID / empreinte / code
       </button>
       {error && <p className="field__error">{error}</p>}
     </Page>

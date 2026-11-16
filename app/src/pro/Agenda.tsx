@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { capitalize, fmt, salon, sameDay, useDemoState, useNow } from '../ui/common'
 import { AppointmentRow } from './parts'
+import { AgendaNotice } from '@novia/extra'
 
 export function Agenda() {
   const st = useDemoState()
@@ -32,6 +33,7 @@ export function Agenda() {
           <h1 className="display">{offset === 0 ? 'Aujourd’hui' : capitalize(fmt.dayLong(day))}</h1>
         </div>
       </header>
+      <AgendaNotice />
       <div className="days" role="listbox" aria-label="Jour" style={{ marginTop: 10 }}>
         {days.map((d, i) => {
           const n = st.appointments.filter((a) => sameDay(new Date(a.start), d) && a.status !== 'rescheduled' && a.status !== 'cancelled').length
