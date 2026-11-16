@@ -39,16 +39,35 @@ describe('séparation démo / pilote', () => {
     expect(files.filter((f) => /\.demo\.tsx?$/.test(f))).toEqual([])
   })
 
-  it('la composition pilote n’embarque aucune donnée ni contrôle de démo', async () => {
-    const { createPilotNovia, mode } = await import('./app/pilot')
-    const novia = createPilotNovia()
-    expect(mode).toBe('pilot')
-    expect(novia.demo).toBeNull()
-    expect(novia.execution).toBe('shadow')
-    expect(novia.profile.identity.name.status).toBe('unknown')
-    const s = novia.snapshot()
-    expect([s.customers, s.appointments, s.runs, s.messages]).toEqual([[], [], [], []])
-    expect(JSON.stringify(s)).not.toMatch(/Julie|NOVIA Nails|exemple\.demo/)
+  it('la composition pilote n’embarque aucune donnée de démo et attend le serveur', async () => {
+    const pilot = await import('./app/pilot')
+    expect(pilot.mode).toBe('pilot')
+    // aucun état local inventé : `novia` n'existe qu'une fois l'état lu sur le serveur
+    expect(pilot.novia).toBeUndefined()
+    const scope = files.filter((f) => f === 'app/pilot.ts' || f === 'app/pilot-shell.tsx' || f.startsWith('pilot/'))
+    expect(scope.filter((f) => /Julie|NOVIA Nails|exemple\.demo/.test(sources[`./${f}`]))).toEqual([])
+  })
+})
+
+describe('pilote P2 : le serveur fait autorité, aucun transport', () => {
+  it('le navigateur pilote n’embarque aucun provider (ni Mock, ni GHL, ni futur) et ne persiste pas l’état', () => {
+    const scope = files.filter((f) => f === 'app/pilot.ts' || f === 'app/pilot-shell.tsx' || f.startsWith('pilot/'))
+    // seule l'horloge système (technique) est permise
+    expect(violations(scope, (t) => /^providers(\/|$)/.test(t) && t !== 'providers/clock')).toEqual([])
+    // seule préférence locale : l'établissement choisi sur l'appareil (aucune donnée métier)
+    expect(scope.filter((f) => /localStorage\.setItem\((?!CHOICE)/.test(sources[`./${f}`]))).toEqual([])
+  })
+
+  it('le code du navigateur n’importe jamais le serveur, pg, la partie serveur des passkeys ni node:*', () => {
+    const bad = files.flatMap((f) => importsOf(f).filter((t) => /^(\.\.\/server|server\/|pg$|@simplewebauthn\/server|node:)/.test(t)).map((t) => `${f} → ${t}`))
+    expect(bad).toEqual([])
+  })
+
+  it('aucune adresse ni clé de fournisseur réel dans le code du navigateur', () => {
+    // providers/ghl et providers/future : interfaces PRÉPARÉES, non connectées, jamais importées par le pilote (test ci-dessus)
+    const real = /gohighlevel|leadconnector|twilio|stripe\.com|api\.stripe|sk_live|AC[0-9a-f]{32}/i
+    expect(files.filter((f) => !f.startsWith('providers/') && real.test(sources[`./${f}`]))).toEqual([])
+    expect(files.filter((f) => /https?:\/\/[^'"`\s]*(gohighlevel|leadconnector|twilio|stripe)/i.test(sources[`./${f}`]))).toEqual([])
   })
 })
 

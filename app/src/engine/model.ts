@@ -70,6 +70,21 @@ export interface OutboxEntry {
   externalRef?: ExternalRef
 }
 
+/**
+ * Décision de NOVIA, exécutée ou non : ce qu'elle aurait fait (WOULD_EXECUTE) ou ce qui l'en
+ * a empêchée (BLOCKED), avec la raison et les gardes relues. En mode shadow (pilote), c'est
+ * la trace de travail : « aurait envoyé ce rappel », « envoi bloqué : opposition active ».
+ */
+export interface DecisionDetail {
+  /** W02, W03, W04, SmartFill, FAQ… */
+  workflow?: string
+  /** action envisagée */
+  action: string
+  result: 'WOULD_EXECUTE' | 'BLOCKED'
+  reason: string
+  guards?: { name: string; ok: boolean }[]
+}
+
 /** Journal d'audit : décisions de NOVIA, y compris celles qu'elle n'a PAS exécutées (shadow, blocage). */
 export interface JournalEntry {
   at: string
@@ -79,6 +94,7 @@ export interface JournalEntry {
   input?: string
   customerId?: string
   appointmentId?: string
+  decision?: DecisionDetail
 }
 
 export interface NoviaState {

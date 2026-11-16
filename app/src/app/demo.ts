@@ -8,7 +8,7 @@
 import { createDemoControls } from '../demo/controls'
 import { demoProfile } from '../demo/config/profile'
 import { demoClock, demoStore, resetDemo } from '../demo/store'
-import { createNovia } from '../domain/intents'
+import { createNovia, type PaymentWording } from '../domain/intents'
 import { createEngine } from '../engine'
 import { createMockProviders } from '../providers/mock'
 
@@ -20,3 +20,16 @@ export function createDemoNovia() {
 }
 
 export const novia = createDemoNovia()
+
+export const paymentWording: PaymentWording = {
+  action: 'Simuler une preuve de paiement (fictive) → CA confirmé',
+  actionShort: 'Simuler une preuve de paiement (fictive)',
+  done: 'Preuve fictive enregistrée : CA confirmé.',
+  note: null,
+  kpiFootnote: 'Données de démonstration, entièrement fictives. Aucun montant n’est encaissé par NOVIA.',
+}
+
+/** La démonstration est prête immédiatement : ni serveur, ni connexion, ni réseau. */
+export async function bootstrap(): Promise<{ status: 'ready' }> {
+  return { status: 'ready' }
+}

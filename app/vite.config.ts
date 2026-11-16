@@ -47,6 +47,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'server/**/*.test.ts'],
+    // PostgreSQL jetable pour les tests serveur (aucun effet sur les tests du front)
+    globalSetup: ['server/test/pg-global.ts'],
+    testTimeout: 20_000,
   },
 })

@@ -30,6 +30,7 @@ export type InputSource =
   | 'novia-client' // site de réservation
   | 'novia-engine' // ordonnanceur interne (séquences, rappels)
   | 'novia-demo' // contrôles de simulation
+  | 'pilot-test' // événements de test du pilote (P2 : aucun fournisseur réel branché)
   | 'messaging'
   | 'voice'
   | 'payment'

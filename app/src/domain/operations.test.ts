@@ -293,7 +293,7 @@ describe('Démonstration : horloge et remise à zéro', () => {
 describe('Navigation mobile', () => {
   it('cinq onglets au plus, et chaque page Pro rattachée à un onglet', async () => {
     expect(proTabs.length).toBeLessThanOrEqual(5)
-    const main = Object.values(import.meta.glob('../main.tsx', { query: '?raw', import: 'default', eager: true }))[0] as string
+    const main = Object.values(import.meta.glob('../router.tsx', { query: '?raw', import: 'default', eager: true }))[0] as string
     const block = main.slice(main.indexOf("path: '/pro'"))
     const paths = [...block.matchAll(/path: '([a-z]+)(?:\/:id)?'/g)].map((m) => `/pro/${m[1]}`)
     expect(paths.length).toBeGreaterThanOrEqual(10)

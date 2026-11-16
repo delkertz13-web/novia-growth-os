@@ -15,3 +15,8 @@ export function Shell() {
     </>
   )
 }
+
+/** Écran d'accès : inutile en démonstration (aucune connexion). */
+export function Gate(_: { boot: unknown }) {
+  return null
+}

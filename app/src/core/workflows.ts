@@ -117,6 +117,29 @@ export function evaluateGuards(ctx: GuardContext): GuardDecision {
   return { kind: 'send' }
 }
 
+/**
+ * Toutes les gardes, relues une par une (pour l'audit et le mode shadow). `evaluateGuards`
+ * reste la seule source de la DÉCISION ; cette liste explique ce qui a été vérifié.
+ */
+export function guardChecklist(ctx: GuardContext): { name: string; ok: boolean }[] {
+  const { customer, appointments, runs, now, rules, workflow, sourceAppointment } = ctx
+  const sourceValid =
+    !sourceAppointment ||
+    (workflow === 'W04' ? sourceAppointment.status === 'no_show' : workflow === 'W03' ? sourceAppointment.status === 'cancelled' : true)
+  return [
+    { name: 'RDV d’origine toujours valable', ok: sourceValid },
+    { name: 'pas de nouveau RDV', ok: !hasFutureBooking(appointments, customer.id, now) },
+    { name: 'pas d’opposition (STOP)', ok: !customer.optOut },
+    { name: 'consentement aux messages', ok: customer.consent.transactional },
+    { name: 'pas de reprise humaine', ok: !customer.humanTakeover },
+    {
+      name: 'pas d’autre suivi en cours',
+      ok: !runs.some((r) => r.id !== ctx.runId && r.customerId === customer.id && r.state === 'active' && incompatible[workflow].includes(r.workflow)),
+    },
+    { name: 'plage d’envoi', ok: isWithinSendWindow(now, rules.sendWindow, ctx.timeZone) },
+  ]
+}
+
 /* ------------------------------------------------------------------ */
 /* W02 — rappels                                                        */
 /* ------------------------------------------------------------------ */

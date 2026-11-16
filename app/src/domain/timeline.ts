@@ -63,7 +63,13 @@ function appointmentEvents(a: Appointment, rules: WorkflowRules, services: Servi
   if (a.status === 'no_show') out.push({ id: id('ns'), at: statusAt('no_show') ?? a.start, kind: 'attendance', title: `Absente · ${name}`, detail: `RDV du ${when}`, appointmentId: a.id })
   if (a.status === 'cancelled') out.push({ id: id('cx'), at: statusAt('cancelled') ?? a.start, kind: 'cancelled', title: `Annulation · ${name}`, detail: `RDV du ${when}`, appointmentId: a.id })
   if (a.status === 'rescheduled') out.push({ id: id('rs'), at: statusAt('rescheduled') ?? a.start, kind: 'cancelled', title: `Report · ${name}`, detail: `Initialement le ${when}`, appointmentId: a.id })
-  if (a.paymentProof) out.push({ id: id('pay'), at: a.paymentProof.at, kind: 'payment', title: 'Paiement attesté', detail: 'Preuve fictive (démo)', appointmentId: a.id })
+  if (a.paymentProof) {
+    // NOVIA n'encaisse rien : preuve fictive (démo), déclaration de la pro, ou paiement reçu d'un système externe
+    const p = a.paymentProof
+    const [title, detail] =
+      p.kind === 'demo_payment' ? ['Paiement attesté', 'Preuve fictive (démo)'] : p.kind === 'declared' ? ['Déclaré payé', 'Déclaration de la professionnelle (NOVIA n’encaisse rien)'] : ['Paiement en ligne reçu', 'Confirmé par le prestataire de paiement']
+    out.push({ id: id('pay'), at: p.at, kind: 'payment', title, detail, appointmentId: a.id })
+  }
   return out
 }
 

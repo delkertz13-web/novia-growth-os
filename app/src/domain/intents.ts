@@ -72,6 +72,18 @@ export interface DemoControls {
   acceptSmartFill(opportunityId: string, funnel: SmartFillFunnel): Promise<SmartFillOutcome | null>
 }
 
+/**
+ * Libellés du paiement. NOVIA n'encaisse jamais rien : en démonstration, une preuve FICTIVE ;
+ * en pilote, une DÉCLARATION de la professionnelle. Aucun libellé ne doit laisser croire à un encaissement.
+ */
+export interface PaymentWording {
+  action: string
+  actionShort: string
+  done: string
+  note: string | null
+  kpiFootnote: string
+}
+
 const toIntent = <T>(r: EngineResult<T>): IntentResult<T> => (r.ok ? { ok: true, value: r.value } : { ok: false, error: r.error })
 
 export function createNovia(engine: Engine, opts: { demo?: (novia: NoviaCore) => DemoControls } = {}) {

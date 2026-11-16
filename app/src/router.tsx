@@ -1,0 +1,77 @@
+/** Écrans de NOVIA (chargés après `bootstrap()` : en pilote, l'état vient d'abord du serveur). */
+import { createBrowserRouter, Navigate, RouterProvider, useParams } from 'react-router-dom'
+import { Booking } from './client/Booking'
+import { ClientLayout } from './client/ClientLayout'
+import { Gallery } from './client/Gallery'
+import { Home } from './client/Home'
+import { Infos, Services } from './client/Services'
+import { Agenda } from './pro/Agenda'
+import { AppointmentDetail } from './pro/AppointmentDetail'
+import { CustomerFile } from './pro/CustomerFile'
+import { Customers } from './pro/Customers'
+import { Conversation, Messages } from './pro/Messages'
+import { Settings } from './pro/Settings'
+import { Voice } from './pro/Voice'
+import { Dashboard } from './pro/Dashboard'
+import { Novia } from './pro/Novia'
+import { ProLayout } from './pro/ProLayout'
+import { Revenue } from './pro/Revenue'
+import { ScrollTop } from './ui/common'
+// démo : bandeau DÉMO + remise à zéro ; pilote : rien (aiguillé par NOVIA_MODE, vite.config.ts)
+import { Shell } from '@novia/shell'
+
+function Root() {
+  return (
+    <>
+      <ScrollTop />
+      <Shell />
+    </>
+  )
+}
+
+function LegacyCustomer() {
+  const { id } = useParams()
+  return <Navigate to={`/pro/clientes/${id}`} replace />
+}
+
+const router = createBrowserRouter([
+  {
+    element: <Root />,
+    children: [
+      {
+        element: <ClientLayout />,
+        children: [
+          { path: '/', element: <Home /> },
+          { path: '/galerie', element: <Gallery /> },
+          { path: '/prestations', element: <Services /> },
+          { path: '/infos', element: <Infos /> },
+          { path: '/reserver', element: <Booking /> },
+        ],
+      },
+      {
+        path: '/pro',
+        element: <ProLayout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: 'agenda', element: <Agenda /> },
+          { path: 'rdv/:id', element: <AppointmentDetail /> },
+          { path: 'clientes', element: <Customers /> },
+          { path: 'clientes/:id', element: <CustomerFile /> },
+          // ancienne adresse de la fiche (Lot 5)
+          { path: 'cliente/:id', element: <LegacyCustomer /> },
+          { path: 'messages', element: <Messages /> },
+          { path: 'messages/:id', element: <Conversation /> },
+          { path: 'novia', element: <Novia /> },
+          { path: 'voice', element: <Voice /> },
+          { path: 'revenue', element: <Revenue /> },
+          { path: 'reglages', element: <Settings /> },
+        ],
+      },
+      { path: '*', element: <Home /> },
+    ],
+  },
+])
+
+export function App() {
+  return <RouterProvider router={router} />
+}

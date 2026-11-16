@@ -37,6 +37,7 @@ import {
   advanceRecovery,
   declineRecovery,
   evaluateGuards,
+  guardChecklist,
   markRecovered,
   pauseRun,
   reminderTimes,
@@ -46,7 +47,7 @@ import {
 } from '../core/workflows'
 import { triage, type Triage } from '../core/triage'
 import type { ContactInput, InputOf, NoviaInput } from './events'
-import { LIMITS, type ExecutionMode, type JournalEntry, type NoviaState, type OutboundMessage, type OutboxEntry } from './model'
+import { LIMITS, type DecisionDetail, type ExecutionMode, type JournalEntry, type NoviaState, type OutboundMessage, type OutboxEntry } from './model'
 
 /** Refus métier lisible (créneau pris, statut incohérent…) : jamais une panne. */
 export class EngineError extends Error {}
@@ -104,9 +105,17 @@ export class Tx {
   appointment(id: string) {
     return this.state.appointments.find((a) => a.id === id)
   }
-  journal(kind: JournalEntry['kind'], label: string, refs: Pick<JournalEntry, 'customerId' | 'appointmentId'> = {}) {
+  journal(kind: JournalEntry['kind'], label: string, refs: Pick<JournalEntry, 'customerId' | 'appointmentId' | 'decision'> = {}) {
     const e: JournalEntry = { at: this.at, kind, label, input: this.input.type, ...refs }
     this.update((s) => ({ ...s, journal: [e, ...s.journal].slice(0, LIMITS.journal) }))
+  }
+  /**
+   * Trace une décision NON exécutée ou bloquée (« aurait démarré », « bloqué : opposition »).
+   * En démonstration (simulée), rien n'est ajouté : le parcours de démo reste identique.
+   */
+  decision(decision: DecisionDetail, refs: Pick<JournalEntry, 'customerId' | 'appointmentId'> = {}) {
+    if (this.simulated) return
+    this.journal(decision.result === 'BLOCKED' ? 'blocked' : 'would_send', decision.reason, { ...refs, decision })
   }
   /**
    * Une donnée de profil dont dépend une automatisation est-elle utilisable ? Sinon,
@@ -115,7 +124,18 @@ export class Tx {
    */
   allowed(what: string, statuses: DataStatus[], refs?: Pick<JournalEntry, 'customerId' | 'appointmentId'>) {
     if (statuses.every((s) => usable(s, this.simulated))) return true
-    this.journal('blocked', `${what} : bloqué, donnée du profil non vérifiée.`, refs)
+    const workflow = /W0\d/.exec(what)?.[0] ?? (/SmartFill/.test(what) ? 'SmartFill' : /Réponse/.test(what) ? 'FAQ' : undefined)
+    const unknown = statuses.some((s) => s === 'unknown')
+    this.journal('blocked', `${what} : bloqué, donnée du profil non vérifiée.`, {
+      ...refs,
+      decision: {
+        workflow,
+        action: what,
+        result: 'BLOCKED',
+        reason: unknown ? 'Donnée du profil inconnue : à fournir et vérifier avec l’établissement.' : 'Donnée du profil non vérifiée par l’établissement.',
+        guards: [{ name: 'profil vérifié', ok: false }],
+      },
+    })
     return false
   }
   enqueue(kind: OutboxEntry['kind'], ref: string, key: string) {
@@ -378,6 +398,13 @@ export function recordOutcome(tx: Tx, appointmentId: string, outcome: Validation
     })
   }
   if (newRun) tx.journal('decision', newRun.state === 'active' ? `${newRun.workflow} démarrée.` : `${newRun.workflow} non démarrée : ${newRun.actions.at(-1)?.label}`, refs)
+  if (newRun)
+    tx.decision(
+      newRun.state === 'active'
+        ? { workflow: newRun.workflow, action: `Démarrer ${newRun.workflow}`, result: 'WOULD_EXECUTE', reason: `NOVIA aurait démarré la récupération ${newRun.workflow}.` }
+        : { workflow: newRun.workflow, action: `Démarrer ${newRun.workflow}`, result: 'BLOCKED', reason: `Récupération ${newRun.workflow} non démarrée : ${newRun.actions.at(-1)?.label ?? ''}` },
+      refs,
+    )
 
   tx.update((st) => ({ ...st, runs: newRun ? [...st.runs, newRun] : st.runs, opportunities: [...st.opportunities, ...newOpps] }))
   return tx.appointment(created?.id ?? a.id)!
@@ -410,6 +437,8 @@ export function setHumanTakeover(tx: Tx, customerId: string, value: boolean) {
     const opportunities = s.opportunities.map((o) => (o.status === 'open' && o.kind !== 'smartfill' && ended.includes(o.sourceAppointmentId) ? { ...o, status: 'lost' as const } : o))
     return { ...s, customers, runs, opportunities }
   })
+  for (const r of tx.state.runs.filter((x) => x.customerId === customerId && x.state === 'paused' && value))
+    tx.decision({ workflow: r.workflow, action: `Suspendre ${r.workflow}`, result: 'BLOCKED', reason: 'Envoi bloqué : reprise humaine.' }, { customerId, appointmentId: r.appointmentId })
   // rendre la main : la conversation n'attend plus la professionnelle
   if (!value)
     tx.update((s) => ({ ...s, conversations: s.conversations.map((c) => (c.customerId === customerId ? { ...c, needsHuman: false, needsHumanReason: undefined } : c)) }))
@@ -425,7 +454,15 @@ export function advanceSequence(tx: Tx, runId: string) {
   if (!run) return
   const customer = tx.customer(run.customerId)!
   const source = run.appointmentId ? tx.appointment(run.appointmentId) : undefined
-  const next = advanceRecovery(run, { customer, appointments: tx.state.appointments, runs: tx.state.runs, now: tx.now, rules: tx.rules(), timeZone: tx.tz, sourceAppointment: source })
+  const ctx = { customer, appointments: tx.state.appointments, runs: tx.state.runs, now: tx.now, rules: tx.rules(), timeZone: tx.tz, sourceAppointment: source }
+  const next = advanceRecovery(run, ctx)
+  // gardes relues AU MOMENT de l'exécution : trace de ce qui a empêché l'envoi
+  if (run.state === 'active' && next.messagesSent === run.messagesSent && next.actions.length > run.actions.length) {
+    const guards = guardChecklist({ ...ctx, workflow: run.workflow, runId: run.id })
+    const failed = guards.find((g) => !g.ok)
+    const reason = failed?.name === 'pas d’opposition (STOP)' ? 'Envoi bloqué : opposition active.' : failed?.name === 'pas de reprise humaine' ? 'Envoi bloqué : reprise humaine.' : (next.actions.at(-1)?.label ?? 'Étape non exécutée.')
+    if (failed) tx.decision({ workflow: run.workflow, action: `${run.workflow} · étape ${run.messagesSent + 1}`, result: 'BLOCKED', reason, guards }, { customerId: customer.id, appointmentId: run.appointmentId })
+  }
   if (next.messagesSent > run.messagesSent && (run.workflow === 'W03' || run.workflow === 'W04')) {
     tx.message({
       key: `${run.workflow}:${run.id}:step${next.messagesSent}`,
@@ -492,7 +529,8 @@ export function launchSmartFill(tx: Tx, opportunityId: string) {
   if (!funnel) return null
   if (!tx.allowed('SmartFill', [tx.profile.smartFill.status, tx.profile.services.status])) return null
   tx.journal('decision', `SmartFill : ${funnel.eligible.length} éligible(s), ${funnel.contactable.length} contactable(s).`)
-  if (!tx.simulated) for (const c of funnel.contactable) tx.journal('would_send', 'SmartFill : NOVIA proposerait le créneau (W12 à concevoir, rien n’est envoyé).', { customerId: c.id })
+  for (const c of funnel.contactable)
+    tx.decision({ workflow: 'SmartFill', action: 'Proposer le créneau libéré', result: 'WOULD_EXECUTE', reason: 'SmartFill : NOVIA proposerait le créneau (W12 à concevoir, rien n’est envoyé).' }, { customerId: c.id })
   return funnel
 }
 
@@ -632,13 +670,19 @@ export function changeSettings(tx: Tx, e: InputOf<'SettingsChanged'>) {
 /** Rappel W02 dû : message de service, jamais pour un RDV annulé, reporté ou passé. */
 export function sendReminder(tx: Tx, appointmentId: string, hoursBefore: number) {
   const a = tx.appointment(appointmentId)
+  const action = `Rappel ${hoursBefore} h`
   if (!a || !isActiveBooking(a.status) || new Date(a.start).getTime() <= tx.now.getTime()) {
     tx.journal('decision', 'Rappel devenu sans objet : rien n’est envoyé.', { appointmentId })
+    tx.decision({ workflow: 'W02', action, result: 'BLOCKED', reason: 'Rappel obsolète : RDV annulé, reporté ou passé.' }, { appointmentId })
     return undefined
   }
   const customer = tx.customer(a.customerId)!
   if (!customer.consent.transactional) {
-    tx.journal('blocked', 'Rappel bloqué : pas de consentement aux messages de service.', { customerId: customer.id, appointmentId })
+    tx.journal('blocked', 'Rappel bloqué : pas de consentement aux messages de service.', {
+      customerId: customer.id,
+      appointmentId,
+      decision: { workflow: 'W02', action, result: 'BLOCKED', reason: 'Rappel bloqué : pas de consentement aux messages de service.', guards: [{ name: 'consentement aux messages', ok: false }] },
+    })
     return undefined
   }
   const service = serviceOf(tx.profile, a.serviceId)
