@@ -17,7 +17,9 @@ export const demoProfile: BusinessProfile = {
   businessId: DEMO_BUSINESS_ID,
   identity: business,
   services: { status: servicesStatus, items: services },
-  breaks: unknown([]),
+  // la démonstration simule un salon dont NOVIA tient l'agenda
+  schedule: { authority: demo('novia'), externalReminders: demo(false) },
+  breaks: demo([]),
   booking: demo({ minNoticeHours: 0, maxAdvanceDays: 60, slotStepMin: 30, bufferMin: 0 }),
   cancellation: demo({ freeCancellationHours: 48, text: cancellationPolicy }),
   rules,

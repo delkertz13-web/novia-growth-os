@@ -282,7 +282,7 @@ describe.skipIf(!hasPg())('pilote — gardes, STOP, reprise humaine, shadow', ()
       const { state } = await u.app.snapshot('pilot-unknown')
       expect(state.messages).toHaveLength(0)
       const d = await u.app.shadowDecisions('pilot-unknown')
-      expect(d.some((x) => x.result === 'BLOCKED' && /inconnue/.test(x.reason))).toBe(true)
+      expect(d.some((x) => x.result === 'BLOCKED' && /Texte de confirmation de RDV : inconnu/.test(x.reason))).toBe(true)
     } finally {
       await u.close()
     }

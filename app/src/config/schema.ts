@@ -2,9 +2,10 @@
  * Chaque valeur de configuration porte son niveau de preuve.
  * - unknown  : information réelle inconnue, rien n'est inventé à sa place
  * - demo     : exemple fictif pour la démonstration
- * - verified : donnée réelle validée par l'établissement
+ * - estimated : information APPROXIMATIVE donnée par l'établissement (jamais traitée comme vérifiée)
+ * - verified : donnée réelle explicitement confirmée par l'établissement
  */
-export type DataStatus = 'unknown' | 'demo' | 'verified'
+export type DataStatus = 'unknown' | 'demo' | 'estimated' | 'verified'
 
 export interface Field<T> {
   value: T
@@ -47,6 +48,10 @@ export interface ServiceConfig {
   /** délai recommandé avant le prochain rendez-vous (remplissage), null si sans objet */
   returnRecommendedAfterDays: number | null
   active: boolean
+  /** réservable en ligne (sinon : uniquement par la professionnelle) */
+  bookableOnline?: boolean
+  /** battement propre à cette prestation (sinon : celui de la politique de réservation) */
+  bufferMin?: number
   /** id d'un visuel de la galerie pour illustrer la prestation */
   coverImageId: string
 }

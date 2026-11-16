@@ -18,6 +18,8 @@ import type { NoviaInput } from '../../src/engine/events'
 import type { NoviaState } from '../../src/engine/model'
 import { anonymizeCustomer, exportCustomer } from '../../src/engine/privacy'
 import { expectedJobs } from '../../src/engine/schedule'
+import type { Provenance } from '../../src/core/types'
+import { planImport, summarize, type ImportRow, type ImportSource } from '../../src/pilot/import'
 import type { NoviaStore } from '../../src/engine/store'
 import type { Db, Sql } from '../infra/db'
 import { createShadowProviders, type ServerClock } from '../infra/shadow-providers'
@@ -96,8 +98,9 @@ export function createNoviaApp(deps: { db: Db; clock: ServerClock }) {
   }
 
   /** Une commande de la professionnelle (déjà validée et autorisée par l'API). */
-  async function command(businessId: string, actor: Actor, draft: Draft, auditDetail: Record<string, unknown> = {}) {
-    const input = { ...draft, businessId, source: 'novia-pro', eventId: randomUUID(), occurredAt: clock.now().toISOString() } as Draft
+  async function command(businessId: string, actor: Actor, draft: Draft, auditDetail: Record<string, unknown> = {}, provenance?: Provenance) {
+    // provenance posée ICI (rôle de l'utilisatrice connectée), jamais par le navigateur
+    const input = { ...draft, businessId, source: 'novia-pro', eventId: randomUUID(), occurredAt: clock.now().toISOString(), ...(provenance ? { provenance } : {}) } as Draft
     const r = await withBusiness(businessId, actor, async (u) => {
       const result = await u.engine.execute(input)
       await audit(u.sql, businessId, actor, `command.${draft.type}`, entityOf(input as NoviaInput), { ok: result.ok, ...auditDetail, ...(result.ok ? {} : { error: result.error }) })
@@ -244,15 +247,93 @@ export function createNoviaApp(deps: { db: Db; clock: ServerClock }) {
     return Number((await db.pool.query('select revision from businesses where id = $1', [businessId])).rows[0]?.revision ?? -1)
   }
 
-  async function shadowDecisions(businessId: string, limit = 100) {
+  /** Décisions shadow (filtrables) avec les avis déjà donnés. */
+  async function shadowDecisions(businessId: string, limit = 100, filter: DecisionFilter = {}) {
+    const where = ['d.business_id = $1']
+    const args: unknown[] = [businessId]
+    const add = (sql: string, v: unknown) => {
+      args.push(v)
+      where.push(sql.replace('?', `$${args.length}`))
+    }
+    if (filter.customerId) add('d.customer_id = ?', filter.customerId)
+    if (filter.workflow) add('d.workflow = ?', filter.workflow)
+    if (filter.result) add('d.result = ?', filter.result)
+    if (filter.from) add('d.at >= ?', filter.from)
+    if (filter.to) add('d.at < ?', filter.to)
+    args.push(limit)
     return db.businessTx(businessId, async (c) =>
       (
         await c.query(
-          `select at, customer_id, appointment_id, workflow, action, result, reason, guards, input_type from shadow_decisions where business_id = $1 order by id desc limit $2`,
-          [businessId, limit],
+          `select d.id, d.at, d.customer_id, d.appointment_id, d.workflow, d.action, d.result, d.reason, d.guards, d.input_type,
+             coalesce((select json_agg(json_build_object('userId', f.user_id, 'verdict', f.verdict, 'comment', f.comment, 'at', f.at))
+                       from shadow_feedback f where f.business_id = d.business_id and f.decision_id = d.id), '[]') as feedback
+           from shadow_decisions d where ${where.join(' and ')} order by d.id desc limit $${args.length}`,
+          args,
         )
-      ).rows.map((r) => ({ ...r, at: new Date(r.at).toISOString() })),
+      ).rows.map((r) => ({ ...r, id: Number(r.id), at: new Date(r.at).toISOString() })),
     )
+  }
+
+  /**
+   * Métriques du pilote shadow : décisions, blocages et leurs raisons, avis. AUCUN revenu :
+   * en shadow, rien n'est envoyé, donc rien n'est « gagné » par NOVIA.
+   */
+  async function pilotMetrics(businessId: string) {
+    return db.businessTx(businessId, async (c) => {
+      const byResult = (await c.query(`select result, count(*)::int as n from shadow_decisions where business_id = $1 group by result`, [businessId])).rows as { result: string; n: number }[]
+      const byWorkflow = (
+        await c.query(`select coalesce(workflow, 'autre') as workflow, result, count(*)::int as n from shadow_decisions where business_id = $1 group by 1, 2 order by 1, 2`, [businessId])
+      ).rows
+      const blockReasons = (
+        await c.query(`select reason, count(*)::int as n from shadow_decisions where business_id = $1 and result = 'BLOCKED' group by reason order by n desc, reason limit 10`, [businessId])
+      ).rows
+      const feedback = (await c.query(`select verdict, count(*)::int as n from shadow_feedback where business_id = $1 group by verdict`, [businessId])).rows
+      const sum = (pick: (r: { result: string }) => boolean) => byResult.filter(pick).reduce((a, r) => a + r.n, 0)
+      return {
+        decisions: sum(() => true),
+        wouldExecute: sum((r) => r.result === 'WOULD_EXECUTE'),
+        blocked: sum((r) => r.result === 'BLOCKED'),
+        byWorkflow,
+        blockReasons,
+        feedback: { AGREE: 0, DISAGREE: 0, UNSURE: 0, ...Object.fromEntries(feedback.map((r) => [r.verdict, r.n])) },
+      }
+    })
+  }
+
+  /**
+   * Import de clientes : le serveur RE-calcule l'aperçu (doublons, erreurs), puis crée les
+   * nouvelles clientes par le moteur (ContactUpserted), avec leur provenance, SANS aucun
+   * consentement marketing. `dryRun` : aperçu seul, rien n'est écrit.
+   */
+  async function importCustomers(businessId: string, actor: Actor, rows: { line: number; row: ImportRow }[], source: ImportSource, dryRun: boolean) {
+    return withBusiness(businessId, actor, async (u) => {
+      const plan = planImport(rows, u.state().customers)
+      if (dryRun) return { plan, summary: summarize(plan), imported: 0 }
+      let imported = 0
+      for (const p of plan.filter((x) => x.outcome === 'new')) {
+        const r = await u.engine.execute({
+          type: 'ContactUpserted',
+          contact: { firstName: p.row.firstName || '—', lastName: p.row.lastName || '—', phone: p.row.phone, email: p.row.email },
+          leadSource: 'manual',
+          source: 'novia-pro',
+          eventId: randomUUID(),
+          occurredAt: clock.now().toISOString(),
+          provenance: source,
+        })
+        if (r.ok) imported++
+      }
+      await audit(u.sql, businessId, actor, 'customers.imported', null, { source, ...summarize(plan), imported })
+      return { plan, summary: summarize(plan), imported }
+    })
+  }
+
+  /** Une modification de la préparation (profil, fiche, modèles, FAQ) : les autres appareils la verront. */
+  async function pilotChange<T>(businessId: string, work: (c: Sql) => Promise<T>) {
+    return db.businessTx(businessId, async (c) => {
+      const value = await work(c)
+      await c.query('update businesses set revision = revision + 1 where id = $1', [businessId])
+      return value
+    })
   }
 
   async function auditLog(businessId: string, limit = 100) {
@@ -297,10 +378,34 @@ export function createNoviaApp(deps: { db: Db; clock: ServerClock }) {
     })
   }
 
-  return { withBusiness, command, ingest, flushOutbox, flushAllOutboxes, runDueJobs, snapshot, revision, shadowDecisions, auditLog, exportCustomerData, anonymizeCustomerData }
+  return {
+    withBusiness,
+    command,
+    ingest,
+    flushOutbox,
+    flushAllOutboxes,
+    runDueJobs,
+    snapshot,
+    revision,
+    shadowDecisions,
+    pilotMetrics,
+    importCustomers,
+    pilotChange,
+    auditLog,
+    exportCustomerData,
+    anonymizeCustomerData,
+  }
 }
 
 export type NoviaApp = ReturnType<typeof createNoviaApp>
+
+export interface DecisionFilter {
+  customerId?: string
+  workflow?: string
+  result?: 'WOULD_EXECUTE' | 'BLOCKED'
+  from?: string
+  to?: string
+}
 
 /** Entité visée par une entrée (pour l'audit). */
 function entityOf(input: NoviaInput): { type: string; id: string } | null {

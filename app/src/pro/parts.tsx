@@ -108,6 +108,7 @@ export function ReschedulePicker({
           </button>
         ))}
       </div>
+      {!current && <ManualReschedule a={a} onPick={onPick} />}
       {current && (
         <div className="slots">
           {current.slots.map((s) => (
@@ -118,6 +119,28 @@ export function ReschedulePicker({
         </div>
       )}
     </Sheet>
+  )
+}
+
+/**
+ * Sans créneau calculé par NOVIA (ex. Planity fait foi pour l'agenda), la pro saisit la
+ * nouvelle date telle qu'elle figure dans son agenda : NOVIA ne prétend rien savoir des
+ * disponibilités.
+ */
+function ManualReschedule({ a, onPick }: { a: Appointment; onPick: (d: Date) => void }) {
+  const [value, setValue] = useState('')
+  const picked = value ? salon.parseLocal(value) : null
+  return (
+    <div className="field" style={{ display: 'grid', gap: 10 }}>
+      <label htmlFor={`resched-${a.id}`}>Nouvelle date et heure (telle que dans votre agenda)</label>
+      <input id={`resched-${a.id}`} type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} />
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+        NOVIA ne calcule pas de créneau libre ici : votre agenda fait foi.
+      </p>
+      <button className="btn btn--primary btn--block" disabled={!picked} onClick={() => picked && onPick(picked)}>
+        Enregistrer le report
+      </button>
+    </div>
   )
 }
 

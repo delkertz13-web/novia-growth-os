@@ -1,7 +1,8 @@
 /**
- * Entreprises et profils. Un profil pilote ne contient QUE des valeurs `unknown` ou
- * `verified` : une valeur de démonstration est refusée (elle ne doit jamais piloter une
- * automatisation réelle, même en shadow).
+ * Entreprises et profils. Un profil pilote ne contient QUE des valeurs `unknown`,
+ * `estimated` ou `verified` : une valeur de démonstration est refusée (elle ne doit jamais
+ * piloter une automatisation réelle, même en shadow). Une valeur estimée n'est jamais
+ * traitée comme vérifiée par le moteur.
  */
 import type { BusinessProfile } from '../../src/config/profile'
 import type { DataStatus } from '../../src/config/schema'
@@ -11,6 +12,7 @@ import type { Db, Sql } from '../infra/db'
 import type { Actor } from './state'
 import { insertInitialSettings } from './state'
 import { audit } from './audit'
+import { mergeApproved } from './pilot'
 
 export class ProfileError extends Error {}
 
@@ -29,9 +31,9 @@ export function validatePilotProfile(p: BusinessProfile, businessId: string) {
   if (!p || typeof p !== 'object') throw new ProfileError('Profil invalide.')
   if (p.businessId !== businessId) throw new ProfileError('Le profil désigne une autre entreprise.')
   if (!isValidTimeZone(p.identity?.timezone?.value)) throw new ProfileError('Fuseau horaire invalide.')
-  const allowed: DataStatus[] = ['unknown', 'verified']
+  const allowed: DataStatus[] = ['unknown', 'estimated', 'verified']
   const bad = statuses(p).filter((s) => !allowed.includes(s.status as DataStatus))
-  if (bad.length) throw new ProfileError(`Statut refusé (pilote : unknown ou verified uniquement) : ${bad.map((b) => b.path).join(', ')}`)
+  if (bad.length) throw new ProfileError(`Statut refusé (pilote : inconnu, estimé ou vérifié uniquement) : ${bad.map((b) => b.path).join(', ')}`)
   // forme minimale attendue par le moteur
   const template = createPilotProfile(businessId, p.identity.timezone.value)
   for (const k of Object.keys(template) as (keyof BusinessProfile)[]) if (!(k in p)) throw new ProfileError(`Champ manquant : ${k}`)
@@ -54,10 +56,18 @@ export async function createBusiness(db: Db, input: { id: string; timezone: stri
   return profile
 }
 
-export async function loadProfile(c: Sql, businessId: string): Promise<BusinessProfile> {
+/** Profil tel qu'enregistré (édition par la fiche de préparation). */
+export async function loadStoredProfile(c: Sql, businessId: string): Promise<BusinessProfile> {
   const r = await c.query('select profile from business_profiles where business_id = $1', [businessId])
   if (!r.rowCount) throw new ProfileError('Profil introuvable.')
-  return r.rows[0].profile as BusinessProfile
+  const p = r.rows[0].profile as BusinessProfile
+  // profils créés avant P3 : agenda inconnu (donc aucune disponibilité affichée)
+  return p.schedule ? p : { ...p, schedule: { authority: { value: 'planity', status: 'unknown' }, externalReminders: { value: false, status: 'unknown' } } }
+}
+
+/** Profil que lit le MOTEUR : modèles et FAQ = ceux APPROUVÉS de l'entreprise, rien d'autre. */
+export async function loadProfile(c: Sql, businessId: string): Promise<BusinessProfile> {
+  return mergeApproved(c, businessId, await loadStoredProfile(c, businessId))
 }
 
 export async function saveProfile(c: Sql, businessId: string, profile: BusinessProfile, actor: Actor) {
@@ -66,7 +76,8 @@ export async function saveProfile(c: Sql, businessId: string, profile: BusinessP
   await c.query('update businesses set name = $2, timezone = $3 where id = $1', [businessId, profile.identity.name.value, profile.identity.timezone.value])
   // l'audit trace QUELLES valeurs ont changé de statut, jamais leur contenu
   const verified = statuses(profile).filter((s) => s.status === 'verified').map((s) => s.path)
-  await audit(c, businessId, actor, 'profile.updated', { type: 'business', id: businessId }, { verified })
+  const estimated = statuses(profile).filter((s) => s.status === 'estimated').map((s) => s.path)
+  await audit(c, businessId, actor, 'profile.updated', { type: 'business', id: businessId }, { verified, estimated })
 }
 
 export async function listBusinessesOf(db: Db, userId: string) {

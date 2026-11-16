@@ -50,7 +50,7 @@ describe('front pilote : client de l’API NOVIA', () => {
     const device = createRemoteEngine(await server.transport.state(), server.transport, createFixedClock(NOW))
     const novia = createNovia(device.engine)
     expect(novia.execution).toBe('shadow')
-    const r = await novia.client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'site', origin: 'site' })
+    const r = await novia.client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'manual', origin: 'pro' })
     expect(r.ok).toBe(true)
     // le navigateur n'a choisi ni la source, ni l'identifiant, ni la date de l'événement
     expect(server.received[0]).not.toHaveProperty('source')
@@ -67,7 +67,7 @@ describe('front pilote : client de l’API NOVIA', () => {
     const b = createRemoteEngine(await server.transport.state(), server.transport, createFixedClock(NOW))
     const novA = createNovia(a.engine)
     const novB = createNovia(b.engine)
-    await novA.client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'site', origin: 'site' })
+    await novA.client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'manual', origin: 'pro' })
     expect(novB.snapshot().appointments).toHaveLength(0)
     const seen = vi.fn()
     novB.subscribe(seen)
@@ -79,7 +79,7 @@ describe('front pilote : client de l’API NOVIA', () => {
   it('serveur injoignable : résultat explicite, aucune décision prise localement', async () => {
     const server = fakeServer()
     const device = createRemoteEngine(await server.transport.state(), { ...server.transport, command: () => Promise.reject(new Error('Serveur NOVIA injoignable')) }, createFixedClock(NOW))
-    const r = await createNovia(device.engine).client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'site', origin: 'site' })
+    const r = await createNovia(device.engine).client.book({ serviceId: 'pose', start: new Date(NOW.getTime() + 26 * 3_600_000), contact: { firstName: 'Test', lastName: 'Cliente', phone: '06 00 00 00 01', email: 't@exemple.invalid' }, source: 'manual', origin: 'pro' })
     expect(r).toEqual({ ok: false, error: 'Serveur NOVIA injoignable' })
     expect(device.engine.store.read().appointments).toHaveLength(0)
     expect(await device.engine.tick()).toBe(0)

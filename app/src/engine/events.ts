@@ -19,6 +19,7 @@ import type {
   ExternalRef,
   LeadSource,
   NoviaSettings,
+  Provenance,
   StatusSource,
   VoiceCall,
 } from '../core/types'
@@ -50,6 +51,8 @@ export interface Envelope {
   externalRefs?: ExternalRef[]
   /** version de l'entité sur laquelle l'émetteur s'appuie : plus ancienne que la nôtre → ignorée */
   version?: number
+  /** provenance de la donnée créée (posée par le SERVEUR selon l'utilisatrice et le canal, jamais par le navigateur) */
+  provenance?: Provenance
 }
 
 export interface ContactInput {
@@ -96,6 +99,9 @@ export type CommandBody =
   | { type: 'ReplyAsPro'; conversationId: string; body: string }
   | { type: 'OpenConversation'; customerId: string; channel: ConversationChannel }
   | { type: 'MarkConversationRead'; conversationId: string }
+  /** correction d'une erreur de saisie (heure, prestation) : ce n'est PAS un report de la cliente */
+  | { type: 'AppointmentCorrected'; appointmentId: string; start?: string; serviceId?: string }
+  | { type: 'WaitlistJoined'; customerId: string; serviceId: string; days: number[]; periods: ('matin' | 'apres-midi' | 'soir')[] }
 
 export type EventType = EventBody['type']
 export type NoviaEvent = Envelope & EventBody

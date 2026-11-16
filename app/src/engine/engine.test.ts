@@ -44,7 +44,7 @@ const firstSlot = (novia: Novia, serviceId: string, from = 1) => {
 }
 const contact = { firstName: 'Nina', lastName: 'Essai', phone: '06 12 12 12 12', email: 'nina@exemple.demo' }
 const book = (novia: Novia, extra: Partial<Parameters<Novia['client']['book']>[0]> = {}) =>
-  novia.client.book({ serviceId: 'remplissage', start: firstSlot(novia, 'remplissage'), contact, source: 'site', origin: 'site', ...extra })
+  novia.client.book({ serviceId: 'remplissage', start: extra.start ?? firstSlot(novia, 'remplissage'), contact, source: 'site', origin: 'site', ...extra })
 const awaiting = (novia: Novia) => novia.pro.cockpit(NOW).toConfirm[0]
 
 const network = { fetch: vi.fn(), xhr: vi.fn(), ws: vi.fn() }
@@ -222,13 +222,32 @@ describe('BusinessProfile injecté', () => {
 
   it('hors simulation, une donnée non vérifiée BLOQUE l’automatisation qui en dépend', async () => {
     const { novia, store, ledger } = setup({ execution: 'live' }) // profil de démo : valeurs « demo »
-    const a = ok(await book(novia))
+    // agenda non vérifié : aucune réservation EN LIGNE, et aucun créneau présenté comme libre
+    const online = await book(novia, { start: parseWall('2026-12-07T08:00:00', TZ) })
+    expect(online.ok).toBe(false)
+    expect(novia.client.availableSlots(parseWall('2026-12-08T00:00:00', TZ), 'remplissage')).toEqual([])
+    // la professionnelle peut toujours saisir le RDV qu'elle a pris elle-même
+    const a = ok(await book(novia, { start: parseWall('2026-12-07T08:00:00', TZ), origin: 'pro', source: 'manual' }))
     expect(a.status).toBe('booked') // la réservation est enregistrée…
     expect(store.read().messages).toHaveLength(0) // …mais aucun message n'est parti
     expect(store.read().journal.some((j) => j.kind === 'blocked' && j.appointmentId === a.id)).toBe(true)
     ok(await novia.pro.declareAbsence(awaiting(novia).id))
     expect(store.read().runs.filter((r) => r.state === 'active' && r.startedAt === NOW.toISOString())).toHaveLength(0)
     expect(ledger.writes).toHaveLength(0)
+  })
+
+  it('Planity fait foi (scénario A) : aucune disponibilité inventée, même avec horaires et prestations vérifiés', async () => {
+    const all = verified(demoProfile)
+    const planity: BusinessProfile = { ...all, schedule: { ...all.schedule, authority: { value: 'planity', status: 'verified' } } }
+    const day = parseWall('2026-12-08T00:00:00', TZ)
+    const a = setup({ execution: 'live', profile: planity })
+    expect(a.novia.client.availableSlots(day, 'remplissage')).toEqual([])
+    expect((await book(a.novia, { start: parseWall('2026-12-08T10:00:00', TZ) })).ok).toBe(false)
+    // saisie d'un RDV observé (recopié de Planity) : acceptée
+    expect((await book(a.novia, { start: parseWall('2026-12-08T10:00:00', TZ), origin: 'pro', source: 'manual' })).ok).toBe(true)
+    // agenda NOVIA vérifié : les créneaux réapparaissent
+    const b = setup({ execution: 'live', profile: all })
+    expect(b.novia.client.availableSlots(day, 'remplissage').length).toBeGreaterThan(0)
   })
 
   it('le profil pilote n’invente rien : tout est inconnu et les automatisations sont coupées', () => {

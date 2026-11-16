@@ -23,6 +23,9 @@ export class BusinessNotFound extends Error {}
 
 export function createDb(connectionString: string, opts: { max?: number } = {}): Db {
   const pool = new pg.Pool({ connectionString, max: opts.max ?? 5 })
+  // connexion inactive coupée par la base (maintenance, bascule) : la connexion est écartée et
+  // remplacée à la prochaine requête ; sans ce gestionnaire, le processus entier s'arrêterait
+  pool.on('error', (e) => console.error(JSON.stringify({ at: new Date().toISOString(), level: 'error', msg: 'db-idle-client', error: e.name })))
   async function tx<T>(work: (c: Sql) => Promise<T>): Promise<T> {
     const c = await pool.connect()
     try {

@@ -11,6 +11,7 @@
  *   les contrôles de démo sont injectés par la composition (src/app/demo.ts).
  */
 import { serviceOf, timeZoneOf, type BusinessProfile } from '../config/profile'
+import { requirementMet, requirementsFor } from '../config/requirements'
 import type { ConsentChange } from '../core/consent'
 import { availableSlots as slotsOf } from '../core/availability'
 import { computeRevenue } from '../core/revenue'
@@ -94,9 +95,11 @@ export function createNovia(engine: Engine, opts: { demo?: (novia: NoviaCore) =>
   const services = () => profile.services.items.filter((s) => s.active)
   const rulesNow = () => ({ ...profile.rules, sendWindow: snapshot().settings.sendWindow })
   const revenue = (period?: { from: Date; to: Date }) => computeRevenue(snapshot().appointments, snapshot().opportunities, period)
+  // aucune fausse disponibilité : sans agenda NOVIA vérifié (ex. Planity fait foi), aucun créneau n'est proposé
+  const onlineBooking = requirementsFor(profile, 'booking_online').every((r) => requirementMet(r, engine.execution === 'simulated'))
   const slots = (day: Date, serviceId: string) => {
     const s = serviceOf(profile, serviceId)
-    return s ? slotsOf(day, s.durationMin, profile.identity.openingHours.value, snapshot().appointments, engine.now(), tz, profile.booking.value.slotStepMin) : []
+    return s && onlineBooking ? slotsOf(day, s.durationMin, profile.identity.openingHours.value, snapshot().appointments, engine.now(), tz, profile.booking.value.slotStepMin) : []
   }
 
   /** Statut réel d'un rendez-vous, toujours déclaré par la professionnelle depuis le cockpit. */

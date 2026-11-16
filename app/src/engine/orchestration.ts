@@ -13,8 +13,9 @@
  * font aucun appel réseau et n'appellent aucun provider. Les envois sont DÉCIDÉS ici et
  * EXÉCUTÉS ensuite par dispatch.ts, selon le mode (simulé, shadow, réel).
  */
-import { serviceOf, renderTemplate, timeZoneOf, usable, type BusinessProfile, type TemplateId } from '../config/profile'
-import type { DataStatus, ServiceConfig, WorkflowRules } from '../config/schema'
+import { serviceOf, renderTemplate, timeZoneOf, type BusinessProfile, type TemplateId } from '../config/profile'
+import { requirementMet, requirementsFor, unmetReason, type Capability, type Requirement } from '../config/requirements'
+import type { ServiceConfig, WorkflowRules } from '../config/schema'
 import { applyValidation, isActiveBooking } from '../core/appointmentStatus'
 import { findDuplicate, isSlotFree } from '../core/availability'
 import { applyConsent } from '../core/consent'
@@ -25,12 +26,15 @@ import type {
   AttributionSource,
   Conversation,
   ConversationMessage,
+  ConsentRecord,
   Customer,
   LeadSource,
+  Provenance,
   Opportunity,
   StatusSource,
   ValidationOutcome,
   VoiceCall,
+  WaitlistEntry,
   WorkflowRun,
 } from '../core/types'
 import {
@@ -48,6 +52,15 @@ import {
 import { triage, type Triage } from '../core/triage'
 import type { ContactInput, InputOf, NoviaInput } from './events'
 import { LIMITS, type DecisionDetail, type ExecutionMode, type JournalEntry, type NoviaState, type OutboundMessage, type OutboxEntry } from './model'
+
+/** capacité dont dépend chaque modèle de message */
+const capabilityOf: Record<TemplateId, Capability> = {
+  'W02.confirmation': 'W02.confirmation',
+  'W02.reschedule': 'W02.reschedule',
+  'W02.reminder': 'W02.reminder',
+  'W03.recovery': 'W03',
+  'W04.recovery': 'W04',
+}
 
 /** Refus métier lisible (créneau pris, statut incohérent…) : jamais une panne. */
 export class EngineError extends Error {}
@@ -122,18 +135,19 @@ export class Tx {
    * l'automatisation est BLOQUÉE et le blocage journalisé (jamais d'envoi avec une valeur
    * de démonstration ou inconnue hors simulation).
    */
-  allowed(what: string, statuses: DataStatus[], refs?: Pick<JournalEntry, 'customerId' | 'appointmentId'>) {
-    if (statuses.every((s) => usable(s, this.simulated))) return true
+  allowed(what: string, requirements: Requirement[], refs?: Pick<JournalEntry, 'customerId' | 'appointmentId'>) {
+    if (requirements.every((r) => requirementMet(r, this.simulated))) return true
     const workflow = /W0\d/.exec(what)?.[0] ?? (/SmartFill/.test(what) ? 'SmartFill' : /Réponse/.test(what) ? 'FAQ' : undefined)
-    const unknown = statuses.some((s) => s === 'unknown')
-    this.journal('blocked', `${what} : bloqué, donnée du profil non vérifiée.`, {
+    // raison LISIBLE : quelle donnée manque ou n'est qu'estimée
+    const reasons = requirements.map((r) => unmetReason(r, this.simulated)).filter((x): x is string => !!x)
+    this.journal('blocked', `${what} : bloqué, ${reasons.join(' ')}`, {
       ...refs,
       decision: {
         workflow,
         action: what,
         result: 'BLOCKED',
-        reason: unknown ? 'Donnée du profil inconnue : à fournir et vérifier avec l’établissement.' : 'Donnée du profil non vérifiée par l’établissement.',
-        guards: [{ name: 'profil vérifié', ok: false }],
+        reason: `Bloqué avant tout envoi. ${reasons.join(' ')}`,
+        guards: requirements.map((r) => ({ name: r.label, ok: requirementMet(r, this.simulated) })),
       },
     })
     return false
@@ -148,13 +162,13 @@ export class Tx {
    * Décide un message automatique. Clé d'idempotence déterministe : une même décision
    * rejouée (double clic, événement reçu deux fois) ne crée jamais un second envoi.
    */
-  message(m: { key: string; template: TemplateId; vars: Record<string, string | number>; customer: Customer; appointmentId?: string; purpose: string; requires?: DataStatus[] }) {
+  message(m: { key: string; template: TemplateId; vars: Record<string, string | number>; customer: Customer; appointmentId?: string; purpose: string }) {
     if (this.state.messages.some((x) => x.idempotencyKey === m.key) || this.state.outbox.some((o) => o.key === m.key)) {
       this.journal('duplicate', `Envoi déjà décidé (${m.key}) : ignoré.`, { customerId: m.customer.id, appointmentId: m.appointmentId })
       return undefined
     }
     const template = this.profile.templates[m.template]
-    if (!this.allowed(`Message ${m.purpose}`, [template.status, ...(m.requires ?? [])], { customerId: m.customer.id, appointmentId: m.appointmentId })) return undefined
+    if (!this.allowed(`Message ${m.purpose}`, requirementsFor(this.profile, capabilityOf[m.template]), { customerId: m.customer.id, appointmentId: m.appointmentId })) return undefined
     const msg: OutboundMessage = {
       to: fullName(m.customer),
       customerId: m.customer.id,
@@ -181,7 +195,28 @@ export class Tx {
 /* Clientes                                                             */
 /* ------------------------------------------------------------------ */
 
-export function upsertContact(tx: Tx, contact: ContactInput, source: LeadSource): Customer {
+/** Provenance d'une donnée créée par cette entrée (posée par le serveur ; sinon déduite du canal NOVIA). */
+function provenanceOf(tx: Tx): Provenance | undefined {
+  if (tx.input.provenance) return tx.input.provenance
+  if (tx.input.source === 'novia-client') return 'NOVIA_BOOKING'
+  return undefined
+}
+
+/**
+ * Consentement transactionnel initial, avec sa VRAIE origine : une réservation (case du
+ * formulaire), un import (cliente existante du salon) ou une saisie de l'établissement.
+ * Jamais de consentement marketing par défaut.
+ */
+function initialTransactional(tx: Tx, id: string, via: 'booking' | 'contact') {
+  const p = provenanceOf(tx)
+  const imported = p === 'IMPORT' || p === 'PLANITY_EXPORT'
+  const source: ConsentRecord['source'] = via === 'booking' && !imported ? 'booking_form' : imported ? 'import' : 'pro_declared'
+  const proofRef =
+    source === 'booking_form' ? 'Réservation : messages liés au rendez-vous' : source === 'import' ? 'Import : cliente existante, messages liés à ses rendez-vous' : 'Saisie par l’établissement : messages liés aux rendez-vous'
+  return { id: `${id}-t`, at: tx.at, channel: 'sms' as const, purpose: 'transactional' as const, state: 'granted' as const, source, proofRef }
+}
+
+export function upsertContact(tx: Tx, contact: ContactInput, source: LeadSource, via: 'booking' | 'contact' = 'contact'): Customer {
   const existing = findDuplicate(tx.state.customers, contact)
   if (existing) {
     const updated = { ...existing, lastActivityAt: tx.at }
@@ -199,9 +234,10 @@ export function upsertContact(tx: Tx, contact: ContactInput, source: LeadSource)
     consent: { transactional: true, marketing: false },
     optOut: false,
     // réserver = accepter les messages liés à SON rendez-vous ; le marketing exige une case cochée
-    consents: [{ id: `${id}-t`, at: tx.at, channel: 'sms', purpose: 'transactional', state: 'granted', source: 'booking_form', proofRef: 'Réservation : messages liés au rendez-vous' }],
+    consents: [initialTransactional(tx, id, via)],
     humanTakeover: false,
     lastActivityAt: tx.at,
+    ...(provenanceOf(tx) ? { provenance: provenanceOf(tx) } : {}),
   }
   tx.update((s) => ({ ...s, customers: [...s.customers, c] }))
   if (tx.ctx.has.crm) tx.enqueue('crm.upsert', c.id, `crm:upsert:${c.id}`)
@@ -231,6 +267,7 @@ function insertAppointment(tx: Tx, customer: Customer, service: ServiceConfig, s
     bookedAt: tx.at,
     version: 1,
     ...(tx.input.externalRefs ? { externalRefs: tx.input.externalRefs } : {}),
+    ...(provenanceOf(tx) ? { provenance: provenanceOf(tx) } : {}),
   }
   tx.update((st) => ({
     ...st,
@@ -245,7 +282,6 @@ function insertAppointment(tx: Tx, customer: Customer, service: ServiceConfig, s
     customer,
     appointmentId: a.id,
     purpose: 'W02 · confirmation',
-    requires: [tx.profile.identity.name.status],
   })
   return a
 }
@@ -283,6 +319,13 @@ export function createBooking(tx: Tx, e: InputOf<'BookingCreated'>): Appointment
   if (Number.isNaN(start.getTime())) throw new EngineError('Créneau invalide')
   const opp = e.opportunityId ? tx.state.opportunities.find((o) => o.id === e.opportunityId) : undefined
   if (e.origin === 'smartfill' && (!opp || opp.kind !== 'smartfill' || opp.status !== 'open')) throw new EngineError('Ce créneau n’est plus proposé.')
+  // réservation EN LIGNE : seulement si NOVIA fait foi pour l'agenda (jamais de fausse disponibilité)
+  if (e.origin === 'site') {
+    const reasons = requirementsFor(tx.profile, 'booking_online')
+      .map((r) => unmetReason(r, tx.simulated))
+      .filter(Boolean)
+    if (reasons.length) throw new EngineError(`Réservation en ligne indisponible. ${reasons.join(' ')}`)
+  }
   // jamais de double réservation (le créneau a pu être pris entre-temps)
   if (!isSlotFree(start, service.durationMin, tx.state.appointments)) throw new EngineError('Ce créneau vient d’être réservé. Choisissez-en un autre.')
 
@@ -295,7 +338,7 @@ export function createBooking(tx: Tx, e: InputOf<'BookingCreated'>): Appointment
   } else {
     if (!e.contact) throw new EngineError('Coordonnées manquantes')
     isNew = !findDuplicate(tx.state.customers, e.contact)
-    customer = upsertContact(tx, e.contact, e.leadSource)
+    customer = upsertContact(tx, e.contact, e.leadSource, 'booking')
   }
   // case marketing cochée : enregistrée avec sa preuve. Elle ne lève JAMAIS une opposition (STOP).
   if (e.marketingConsent?.granted) {
@@ -369,7 +412,7 @@ export function recordOutcome(tx: Tx, appointmentId: string, outcome: Validation
     ...extra,
   })
   const refs = { customerId: customer.id, appointmentId: a.id }
-  const mayStart = (wf: 'W03' | 'W04') => tx.allowed(`Récupération ${wf}`, [rules.status, tx.profile.templates[`${wf}.recovery`].status], refs)
+  const mayStart = (wf: 'W03' | 'W04') => tx.allowed(`Récupération ${wf}`, requirementsFor(tx.profile, wf), refs)
 
   if (outcome === 'absent') {
     // le montant reste « à récupérer » ; la séquence ne démarre que si la récupération est activée
@@ -419,6 +462,44 @@ export function recordOutcome(tx: Tx, appointmentId: string, outcome: Validation
  * Elle rend la main : chaque séquence est relue contre l'état actuel avant de reprendre
  * (ou s'arrête si elle est devenue obsolète ; son montant n'est alors plus à récupérer).
  */
+/**
+ * Correction d'une ERREUR DE SAISIE sur un RDV encore actif (heure, prestation). Ce n'est
+ * pas un report : aucune relance, aucun message « RDV déplacé ». Les rappels suivent la
+ * nouvelle heure (l'ordonnanceur les recalcule).
+ */
+export function correctAppointment(tx: Tx, e: InputOf<'AppointmentCorrected'>): Appointment {
+  const a = tx.appointment(e.appointmentId)
+  if (!a) throw new EngineError('Rendez-vous introuvable')
+  if (!isActiveBooking(a.status)) throw new EngineError('Seul un rendez-vous à venir peut être corrigé. Pour un RDV passé, déclarez présence, absence ou annulation.')
+  const service = e.serviceId ? serviceOf(tx.profile, e.serviceId) : serviceOf(tx.profile, a.serviceId)
+  if (e.serviceId && !service) throw new EngineError('Prestation inconnue')
+  const start = e.start ? new Date(e.start) : new Date(a.start)
+  if (Number.isNaN(start.getTime())) throw new EngineError('Heure invalide')
+  const others = tx.state.appointments.filter((x) => x.id !== a.id)
+  const duration = service?.durationMin ?? a.durationMin
+  if (!isSlotFree(start, duration, others)) throw new EngineError('Un autre RDV saisi occupe déjà ce créneau.')
+  const updated: Appointment = {
+    ...a,
+    start: start.toISOString(),
+    ...(service && e.serviceId ? { serviceId: service.id, durationMin: service.durationMin, price: service.price, deposit: service.deposit } : {}),
+    version: (a.version ?? 0) + 1,
+    history: [...a.history, { at: tx.at, from: a.status, to: a.status, source: 'cockpit', note: 'correction de saisie' }],
+  }
+  tx.update((s) => ({ ...s, appointments: s.appointments.map((x) => (x.id === a.id ? updated : x)) }))
+  tx.journal('decision', 'RDV corrigé (erreur de saisie) : aucun message, rappels recalculés.', { customerId: a.customerId, appointmentId: a.id })
+  return updated
+}
+
+/** Liste d'attente : la cliente souhaite un créneau (SmartFill la proposera si elle y a consenti). */
+export function joinWaitlist(tx: Tx, e: InputOf<'WaitlistJoined'>): WaitlistEntry {
+  if (!tx.customer(e.customerId)) throw new EngineError('Cliente introuvable')
+  if (!serviceOf(tx.profile, e.serviceId)) throw new EngineError('Prestation inconnue')
+  if (tx.state.waitlist.some((w) => w.customerId === e.customerId && w.serviceId === e.serviceId)) throw new EngineError('Cette cliente est déjà en liste d’attente pour cette prestation.')
+  const w: WaitlistEntry = { id: tx.id('w'), businessId: tx.state.businessId, customerId: e.customerId, serviceId: e.serviceId, days: e.days, periods: e.periods, flexible: !e.days.length, createdAt: tx.at }
+  tx.update((s) => ({ ...s, waitlist: [...s.waitlist, w] }))
+  return w
+}
+
 export function setHumanTakeover(tx: Tx, customerId: string, value: boolean) {
   if (!tx.customer(customerId)) throw new EngineError('Cliente introuvable')
   const t = tx.now
@@ -527,7 +608,7 @@ export function launchSmartFill(tx: Tx, opportunityId: string) {
   if (!tx.state.settings.automations.smartFill) throw new EngineError('SmartFill est désactivé dans vos réglages.')
   const funnel = funnelFor(tx.state, opportunityId, tx.profile.services.items, tx.now)
   if (!funnel) return null
-  if (!tx.allowed('SmartFill', [tx.profile.smartFill.status, tx.profile.services.status])) return null
+  if (!tx.allowed('SmartFill', requirementsFor(tx.profile, 'smartfill'))) return null
   tx.journal('decision', `SmartFill : ${funnel.eligible.length} éligible(s), ${funnel.contactable.length} contactable(s).`)
   for (const c of funnel.contactable)
     tx.decision({ workflow: 'SmartFill', action: 'Proposer le créneau libéré', result: 'WOULD_EXECUTE', reason: 'SmartFill : NOVIA proposerait le créneau (W12 à concevoir, rien n’est envoyé).' }, { customerId: c.id })
@@ -586,7 +667,7 @@ export function receiveInbound(tx: Tx, e: InputOf<'InboundMessageReceived'>): Tr
   // reprise humaine : NOVIA ne répond pas, la professionnelle est notifiée
   if (customer?.humanTakeover) return { kind: 'human' }
   let t = triage(e.body, tx.profile)
-  if (t.kind === 'faq' && !tx.allowed('Réponse automatique', [tx.profile.approvedAnswers.status], { customerId: conv.customerId }))
+  if (t.kind === 'faq' && !tx.allowed('Réponse automatique', requirementsFor(tx.profile, 'faq'), { customerId: conv.customerId }))
     t = { kind: 'unknown', reason: 'Réponses automatiques non encore validées par la professionnelle.' }
   if (t.kind === 'faq') {
     appendMessage(tx, conv.id, { from: 'novia', body: t.answer.answer, faqId: t.answer.id })
@@ -693,7 +774,6 @@ export function sendReminder(tx: Tx, appointmentId: string, hoursBefore: number)
     customer,
     appointmentId: a.id,
     purpose: `W02 · rappel ${hoursBefore} h`,
-    requires: [tx.profile.rules.status, tx.profile.identity.name.status],
   })
 }
 
@@ -777,5 +857,9 @@ export function decide(tx: Tx, input: NoviaInput): unknown {
       return openConversation(tx, input.customerId, input.channel)
     case 'MarkConversationRead':
       return markRead(tx, input.conversationId)
+    case 'AppointmentCorrected':
+      return correctAppointment(tx, input)
+    case 'WaitlistJoined':
+      return joinWaitlist(tx, input)
   }
 }

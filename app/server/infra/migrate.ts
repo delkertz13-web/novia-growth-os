@@ -7,10 +7,12 @@ import { createHash } from 'node:crypto'
 import pg from 'pg'
 import m0001 from '../migrations/0001_schema.sql?raw'
 import m0002 from '../migrations/0002_isolation.sql?raw'
+import m0003 from '../migrations/0003_pilot_readiness.sql?raw'
 
 export const migrations: { version: string; sql: string }[] = [
   { version: '0001_schema', sql: m0001 },
   { version: '0002_isolation', sql: m0002 },
+  { version: '0003_pilot_readiness', sql: m0003 },
 ]
 
 const LOCK = 47_2001

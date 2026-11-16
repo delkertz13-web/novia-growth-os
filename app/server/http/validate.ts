@@ -43,11 +43,14 @@ function noExtra(o: Obj, allowed: string[]) {
 function contact(v: unknown) {
   if (!isObj(v)) throw new InputError('Coordonnées invalides')
   noExtra(v, ['firstName', 'lastName', 'phone', 'email'])
+  // une cliente se reconnaît à son téléphone OU à son e-mail (au moins l'un des deux)
+  const blank = (k: string) => v[k] === undefined || v[k] === ''
+  if (blank('phone') && blank('email')) throw new InputError('Téléphone ou e-mail requis.')
   return {
     firstName: str(v, 'firstName', { max: 60 })!,
     lastName: str(v, 'lastName', { max: 60 })!,
-    phone: str(v, 'phone', { max: 30, pattern: /^[+0-9 ().-]{6,30}$/ })!,
-    email: str(v, 'email', { max: 120, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ })!,
+    phone: blank('phone') ? '' : str(v, 'phone', { max: 30, pattern: /^[+0-9 ().-]{6,30}$/ })!,
+    email: blank('email') ? '' : str(v, 'email', { max: 120, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ })!,
   }
 }
 
@@ -114,6 +117,24 @@ export function parseCommand(body: unknown): Draft {
           proofRef: str(ch, 'proofRef', { optional: true, max: 300 }),
         },
       }
+    }
+    case 'AppointmentCorrected': {
+      noExtra(body, ['type', 'appointmentId', 'start', 'serviceId'])
+      if (body.start === undefined && body.serviceId === undefined) throw new InputError('Rien à corriger.')
+      return {
+        type,
+        appointmentId: str(body, 'appointmentId', { pattern: ID })!,
+        ...(body.start !== undefined ? { start: date(body, 'start') } : {}),
+        ...(body.serviceId !== undefined ? { serviceId: str(body, 'serviceId', { pattern: ID })! } : {}),
+      }
+    }
+    case 'WaitlistJoined': {
+      noExtra(body, ['type', 'customerId', 'serviceId', 'days', 'periods'])
+      const days = body.days
+      const periods = body.periods
+      if (!Array.isArray(days) || days.length > 7 || !days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) throw new InputError('Jours invalides.')
+      if (!Array.isArray(periods) || periods.length > 3 || !periods.every((p) => ['matin', 'apres-midi', 'soir'].includes(p))) throw new InputError('Moments invalides.')
+      return { type, customerId: str(body, 'customerId', { pattern: ID })!, serviceId: str(body, 'serviceId', { pattern: ID })!, days: [...new Set(days as number[])], periods: [...new Set(periods as ('matin' | 'apres-midi' | 'soir')[])] }
     }
     case 'OpportunityClosed':
       noExtra(body, ['type', 'opportunityId', 'reason'])

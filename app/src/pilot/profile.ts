@@ -31,6 +31,9 @@ export function createPilotProfile(businessId: string, timezone: string): Busine
       currency: 'EUR',
     },
     services: { status: 'unknown', items: [] },
+    // scénario A par défaut : tant que NOVIA n'est pas VÉRIFIÉE comme agenda de référence,
+    // elle ne présente aucun créneau comme disponible
+    schedule: { authority: unknown('planity'), externalReminders: unknown(false) },
     breaks: unknown([]),
     booking: unknown({ minNoticeHours: 0, maxAdvanceDays: 0, slotStepMin: 30, bufferMin: 0 }),
     cancellation: unknown({ freeCancellationHours: 0, text: '' }),

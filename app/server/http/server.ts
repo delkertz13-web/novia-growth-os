@@ -7,7 +7,7 @@
  * à cette entreprise, lue en base à chaque requête : le navigateur ne choisit jamais son
  * entreprise. Les opérations passent par l'application (moteur), jamais par du SQL ici.
  */
-import { createHash } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { extname, join, normalize } from 'node:path'
@@ -17,6 +17,10 @@ import { AuthError, SESSION_DAYS, type Auth, type SessionUser } from '../applica
 import { BusinessNotFound, type Db } from '../infra/db'
 import { ProfileError, listBusinessesOf, saveProfile } from '../repositories/business'
 import { InputError, parseCommand, parseTestEvent } from './validate'
+import { OnboardingError } from '../../src/pilot/onboarding'
+import { PilotError } from '../repositories/pilot'
+import { pilotRoutes } from './pilot-routes'
+import { systemClock, type ServerClock } from '../infra/shadow-providers'
 
 export interface HttpConfig {
   origin: string
@@ -27,6 +31,11 @@ export interface HttpConfig {
   log?: (line: Record<string, unknown>) => void
   /** requêtes d'authentification par minute et par adresse IP (20 par défaut) */
   authPerMinute?: number
+  /**
+   * Jeton du déclencheur CRON (Scaleway : POST / avec {"token": "..."} chaque minute).
+   * Absent : la route n'existe pas. Le minuteur interne reste actif en complément.
+   */
+  cronToken?: string
 }
 
 class HttpError extends Error {
@@ -57,12 +66,12 @@ function rateLimiter(limit: number, windowMs: number) {
 
 /* ---------------- Utilitaires ---------------- */
 
-async function readJson(req: IncomingMessage): Promise<unknown> {
+async function readJson(req: IncomingMessage, max = MAX_BODY): Promise<unknown> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const c of req) {
     size += (c as Buffer).length
-    if (size > MAX_BODY) throw new HttpError(413, 'Requête trop volumineuse.')
+    if (size > max) throw new HttpError(413, 'Requête trop volumineuse.')
     chunks.push(c as Buffer)
   }
   if (!size) return {}
@@ -93,8 +102,12 @@ const MIME: Record<string, string> = {
   '.ico': 'image/x-icon',
 }
 
-export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; config: HttpConfig }) {
+const sameSecret = (a: string, b: string) => timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
+
+export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; config: HttpConfig; clock?: ServerClock; tick?: () => Promise<unknown> }) {
   const { app, auth, db, config } = deps
+  const clock = deps.clock ?? systemClock
+  const cronLimit = rateLimiter(10, 60_000)
   const log = config.log ?? (() => undefined)
   const authLimit = rateLimiter(config.authPerMinute ?? 20, 60_000)
   const apiLimit = rateLimiter(240, 60_000)
@@ -126,6 +139,15 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
     const method = req.method ?? 'GET'
     const path = url.pathname
     const ip = req.socket.remoteAddress ?? '?'
+
+    // Déclencheur CRON (sans cookie ni en-tête NOVIA : authentifié par son jeton seul)
+    if (path === '/' && method === 'POST' && config.cronToken && deps.tick) {
+      cronLimit(ip)
+      const body = (await readJson(req, 4096)) as Record<string, unknown>
+      if (typeof body.token !== 'string' || !sameSecret(body.token, config.cronToken)) throw new HttpError(403, 'Refusé.')
+      await deps.tick()
+      return send(res, 200, { ok: true })
+    }
 
     // CSRF : toute écriture exige l'en-tête NOVIA et une origine identique (cookie SameSite=Strict en plus)
     if (method !== 'GET' && method !== 'HEAD') {
@@ -183,10 +205,27 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
       if (sub === '/revision' && method === 'GET') return send(res, 200, { revision: await app.revision(businessId) })
       if (sub === '/commands' && method === 'POST') {
         const draft = parseCommand(await readJson(req))
-        const r = await app.command(businessId, actor, draft)
+        // provenance posée par le serveur selon le rôle, jamais par le navigateur
+        const r = await app.command(businessId, actor, draft, {}, member.role === 'OWNER' ? 'OWNER_MANUAL' : 'PRO_MANUAL')
         return send(res, 200, { result: r.value, revision: r.revision })
       }
-      if (sub === '/shadow-decisions' && method === 'GET') return send(res, 200, { decisions: await app.shadowDecisions(businessId, limitOf(url)) })
+      // préparation du pilote, Shadow Control Center, avis, métriques, import
+      const handled = await pilotRoutes({
+        app,
+        businessId,
+        sub,
+        method,
+        url,
+        role: member.role,
+        userId: user.id,
+        now: () => clock.now(),
+        body: async (max) => (await readJson(req, max)) as Record<string, unknown>,
+        send: (status, body) => send(res, status, body),
+        forbid: () => {
+          throw new HttpError(403, 'Réservé à la propriétaire.')
+        },
+      })
+      if (handled) return
 
       // ----- réservé à la propriétaire -----
       if (sub === '/test-events' && method === 'POST') {
@@ -268,7 +307,7 @@ export function createHttpServer(deps: { app: NoviaApp; auth: Auth; db: Db; conf
       await route(req, res, url)
     } catch (e) {
       const status =
-        e instanceof HttpError ? e.status : e instanceof InputError || e instanceof ProfileError ? 400 : e instanceof AuthError ? 401 : e instanceof BusinessNotFound ? 404 : 500
+        e instanceof HttpError ? e.status : e instanceof InputError || e instanceof ProfileError || e instanceof OnboardingError || e instanceof PilotError ? 400 : e instanceof AuthError ? 401 : e instanceof BusinessNotFound ? 404 : 500
       // aucune donnée personnelle ni détail interne dans la réponse ou dans le journal technique
       const message = status === 500 ? 'Erreur interne.' : e instanceof Error ? e.message : 'Erreur.'
       if (status === 500) log({ level: 'error', path: maskPath(url.pathname), error: e instanceof Error ? e.name : 'unknown' })

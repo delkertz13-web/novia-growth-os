@@ -21,6 +21,7 @@ navigateur (passkey, cookie HttpOnly) ──HTTPS──▶ API NOVIA ──▶ a
 | `NOVIA_RP_ID` | domaine des passkeys (par défaut : l'hôte de `NOVIA_ORIGIN`). **Ne plus le changer** une fois des passkeys créées |
 | `PORT` | 8080 par défaut |
 | `NOVIA_STATIC_DIR` | front pilote construit (`dist-pilot`, déjà réglé dans l'image) |
+| `NOVIA_CRON_TOKEN` | jeton du déclencheur CRON (`POST /` avec `{"token": "…"}`), 32 caractères au moins ; absent = route désactivée |
 
 ## Construire et lancer
 
@@ -52,9 +53,11 @@ migration publiée ; on en ajoute une nouvelle.
 
 ## Hébergement recommandé : Scaleway, région Paris (fr-par)
 
-- **Serverless Containers** : l'image ci-dessus, `min-scale = 1` (l'ordonnanceur tourne toutes les 30 s dans le processus), `max-scale = 1` pour le pilote.
+Procédure complète, hypothèses fragiles et retour arrière : [`../DEPLOY-SCALEWAY.md`](../DEPLOY-SCALEWAY.md) ; coûts : [`../PILOT-INFRA-COSTS.md`](../PILOT-INFRA-COSTS.md).
+
+- **Serverless Containers** : l'image ci-dessus, `min-scale = 1`, `max-scale = 1` pour le pilote. L'ordonnanceur a deux déclencheurs : un minuteur interne (30 s) et un **déclencheur CRON** chaque minute (`POST /` + jeton), car rien ne garantit que le CPU reste actif entre deux requêtes.
 - **Managed Database for PostgreSQL 16** : sauvegardes automatiques quotidiennes activées, rétention 7 jours minimum, connexion TLS.
-- **Secret Manager** : `DATABASE_URL`, `MIGRATION_DATABASE_URL`, injectés comme variables secrètes du conteneur.
+- **Secrets** : variables **secrètes du conteneur** (`DATABASE_URL`, `NOVIA_CRON_TOKEN`) ; Secret Manager sert de coffre de référence (la doc Scaleway indique que les deux ne sont pas encore reliés).
 - Domaine HTTPS propre (les passkeys sont liées au domaine).
 - Aucun SDK Scaleway dans le code : l'hébergeur est remplaçable (toute plateforme qui exécute une image Docker + un PostgreSQL 16).
 

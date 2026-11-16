@@ -29,7 +29,7 @@ export interface PilotTransport {
 }
 
 /** Champs d'enveloppe : posés par le SERVEUR (source, identifiant, date, entreprise), jamais par le navigateur. */
-const ENVELOPE = ['source', 'eventId', 'occurredAt', 'businessId', 'version', 'externalRefs'] as const
+const ENVELOPE = ['source', 'eventId', 'occurredAt', 'businessId', 'version', 'externalRefs', 'provenance'] as const
 
 export function toCommand(draft: Draft): Draft {
   const out = { ...draft } as Record<string, unknown>

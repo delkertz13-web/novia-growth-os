@@ -8,6 +8,7 @@
  *   NOVIA_RP_ID             domaine des passkeys (par défaut : l'hôte de NOVIA_ORIGIN)
  *   PORT                    port HTTP (8080)
  *   NOVIA_STATIC_DIR        front pilote construit (dist-pilot)
+ *   NOVIA_CRON_TOKEN        jeton du déclencheur CRON (≥ 32 caractères ; absent = pas de route)
  */
 export interface ServerConfig {
   databaseUrl: string
@@ -17,6 +18,13 @@ export interface ServerConfig {
   port: number
   staticDir?: string
   secureCookies: boolean
+  cronToken?: string
+}
+
+function cronToken(v: string | undefined) {
+  if (!v) return undefined
+  if (v.length < 32) throw new Error('NOVIA_CRON_TOKEN trop court (32 caractères au moins).')
+  return v
 }
 
 export function readConfig(env: Record<string, string | undefined> = process.env): ServerConfig {
@@ -35,5 +43,6 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     port: Number(env.PORT ?? 8080),
     staticDir: env.NOVIA_STATIC_DIR,
     secureCookies: u.protocol === 'https:',
+    cronToken: cronToken(env.NOVIA_CRON_TOKEN),
   }
 }
